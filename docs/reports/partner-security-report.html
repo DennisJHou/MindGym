@@ -1,0 +1,384 @@
+<title>MindGym 資料安全與信任說明｜給專業夥伴</title>
+<style>
+  :root {
+    /* 中性色帶松綠偏移，非純灰；紙感底但偏冷、避開常見暖奶油 */
+    --paper:      #EEF1EC;
+    --surface:    #F7F8F4;
+    --surface-2:  #E7EBE3;
+    --ink:        #1C2523;
+    --ink-soft:   #46514D;
+    --muted:      #6E7671;
+    --line:       #D3D9CF;
+    /* 主色：深松綠 = 信任、沉靜、臨床感 */
+    --pine:       #2F5D50;
+    --pine-soft:  #E1EAE4;
+    --pine-ink:   #234a40;
+    /* 輔色：陶土銅，僅用於「人」的溫度，克制使用 */
+    --clay:       #B26A45;
+    --clay-soft:  #F0E2D8;
+    /* 階段色 */
+    --phase:      #7C8B84;
+    --shadow:     0 1px 2px rgba(28,37,35,.04), 0 8px 30px rgba(28,37,35,.06);
+    --radius:     14px;
+    --maxw:       50rem;
+    --serif: "Noto Serif TC", "Source Han Serif TC", "Songti TC", "STSong", serif;
+    --sans:  "Noto Sans TC", "PingFang TC", -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:     #121614;
+      --surface:   #1A201D;
+      --surface-2: #232B27;
+      --ink:       #E9EEE8;
+      --ink-soft:  #B7C0BA;
+      --muted:     #8B958E;
+      --line:      #2E3833;
+      --pine:      #74B7A2;
+      --pine-soft: #1E2B26;
+      --pine-ink:  #A6D6C7;
+      --clay:      #D08A63;
+      --clay-soft: #2C2018;
+      --phase:     #8B978F;
+      --shadow:    0 1px 2px rgba(0,0,0,.3), 0 10px 34px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="light"] {
+    --paper:#EEF1EC; --surface:#F7F8F4; --surface-2:#E7EBE3; --ink:#1C2523;
+    --ink-soft:#46514D; --muted:#6E7671; --line:#D3D9CF; --pine:#2F5D50;
+    --pine-soft:#E1EAE4; --pine-ink:#234a40; --clay:#B26A45; --clay-soft:#F0E2D8;
+    --phase:#7C8B84; --shadow:0 1px 2px rgba(28,37,35,.04),0 8px 30px rgba(28,37,35,.06);
+  }
+  :root[data-theme="dark"] {
+    --paper:#121614; --surface:#1A201D; --surface-2:#232B27; --ink:#E9EEE8;
+    --ink-soft:#B7C0BA; --muted:#8B958E; --line:#2E3833; --pine:#74B7A2;
+    --pine-soft:#1E2B26; --pine-ink:#A6D6C7; --clay:#D08A63; --clay-soft:#2C2018;
+    --phase:#8B978F; --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 34px rgba(0,0,0,.4);
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .page {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.75;
+    font-size: 17px;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: .01em;
+  }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 1.5rem; }
+
+  /* ── 封面 ── */
+  .cover { padding: 5rem 0 3rem; border-bottom: 1px solid var(--line); }
+  .eyebrow {
+    font-size: .8rem; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--pine); font-weight: 700; margin: 0 0 1.1rem;
+    display: flex; align-items: center; gap: .7rem;
+  }
+  .eyebrow::before { content:""; width: 26px; height: 2px; background: var(--pine); display:inline-block; }
+  h1 {
+    font-family: var(--serif); font-weight: 700;
+    font-size: clamp(2.1rem, 5.2vw, 3.15rem); line-height: 1.2;
+    margin: 0 0 1rem; letter-spacing: 0; text-wrap: balance;
+    color: var(--ink);
+  }
+  .lede {
+    font-size: 1.16rem; color: var(--ink-soft); max-width: 40ch;
+    margin: 0 0 2.2rem; line-height: 1.7;
+  }
+  .meta { display: flex; flex-wrap: wrap; gap: 1.6rem 2.4rem; padding-top: .4rem; }
+  .meta div { display: flex; flex-direction: column; gap: .15rem; }
+  .meta dt { font-size: .72rem; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+  .meta dd { margin: 0; font-size: .95rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  /* ── 區段 ── */
+  section { padding: 3.6rem 0; border-bottom: 1px solid var(--line); }
+  section:last-of-type { border-bottom: none; }
+  .sec-head { display: flex; align-items: baseline; gap: 1rem; margin: 0 0 1.6rem; }
+  .sec-num {
+    font-family: var(--serif); font-size: 1rem; font-weight: 700;
+    color: var(--pine); border: 1.5px solid var(--pine); border-radius: 50%;
+    width: 2.1rem; height: 2.1rem; flex: 0 0 auto;
+    display: grid; place-items: center; margin-top: .15rem;
+    font-variant-numeric: tabular-nums;
+  }
+  h2 {
+    font-family: var(--serif); font-weight: 700;
+    font-size: clamp(1.5rem, 3.4vw, 1.95rem); line-height: 1.3;
+    margin: 0; text-wrap: balance; color: var(--ink);
+  }
+  h2 .sub { display:block; font-family: var(--sans); font-weight: 500; font-size: .92rem; color: var(--muted); letter-spacing: .02em; margin-top: .35rem; }
+  p { margin: 0 0 1.15rem; color: var(--ink-soft); }
+  p.body-ink { color: var(--ink); }
+  strong { color: var(--ink); font-weight: 700; }
+
+  /* ── 保護對象三角 ── */
+  .assets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 2rem 0 1.6rem; }
+  .asset {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 1.4rem 1.3rem; box-shadow: var(--shadow);
+  }
+  .asset .tag { font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--clay); font-weight: 700; }
+  .asset h3 { font-family: var(--serif); font-size: 1.18rem; margin: .5rem 0 .5rem; color: var(--ink); font-weight: 700; }
+  .asset p { font-size: .92rem; margin: 0; line-height: 1.6; }
+
+  /* ── 已實作清單 ── */
+  .safeguards { display: flex; flex-direction: column; gap: 1rem; margin: 1.8rem 0 0; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 1.35rem 1.45rem;
+    box-shadow: var(--shadow); position: relative;
+  }
+  .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: .5rem; }
+  .card h3 { font-family: var(--serif); font-size: 1.16rem; font-weight: 700; margin: 0; color: var(--ink); line-height: 1.4; }
+  .card p { margin: 0; font-size: .95rem; line-height: 1.65; }
+  .card .why { margin-top: .55rem; font-size: .9rem; color: var(--muted); padding-left: .85rem; border-left: 2px solid var(--pine-soft); }
+  .card .why b { color: var(--pine); font-weight: 700; }
+
+  .chip {
+    flex: 0 0 auto; font-size: .72rem; font-weight: 700; letter-spacing: .04em;
+    padding: .28rem .7rem; border-radius: 100px; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: .35rem;
+  }
+  .chip.done { background: var(--pine); color: #fff; }
+  :root[data-theme="dark"] .chip.done { color: #0f1613; }
+  @media (prefers-color-scheme: dark) { .chip.done { color: #0f1613; } }
+  .chip.done::before { content:""; width:6px; height:6px; border-radius:50%; background: currentColor; }
+
+  /* ── 透明度提示框 ── */
+  .note {
+    margin: 1.8rem 0 0; background: var(--clay-soft); border: 1px solid transparent;
+    border-left: 3px solid var(--clay); border-radius: 10px; padding: 1.15rem 1.3rem;
+  }
+  .note h4 { margin: 0 0 .45rem; font-size: .95rem; color: var(--clay); font-weight: 700; letter-spacing: .02em; }
+  .note p { margin: 0; font-size: .92rem; color: var(--ink-soft); line-height: 1.65; }
+
+  /* ── 路線圖 ── */
+  .roadmap { display: flex; flex-direction: column; gap: 1.4rem; margin: 1.8rem 0 0; }
+  .phase {
+    display: grid; grid-template-columns: minmax(0,1fr); gap: .9rem;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 1.4rem 1.5rem; box-shadow: var(--shadow);
+  }
+  .phase-head { display: flex; align-items: baseline; gap: .8rem; flex-wrap: wrap; }
+  .phase-when {
+    font-family: var(--serif); font-weight: 700; font-size: 1.2rem; color: var(--ink);
+  }
+  .phase-range { font-size: .78rem; letter-spacing: .12em; text-transform: uppercase; color: var(--pine); font-weight: 700; }
+  .phase ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: .6rem; }
+  .phase li { position: relative; padding-left: 1.3rem; font-size: .95rem; color: var(--ink-soft); line-height: 1.6; }
+  .phase li::before {
+    content:""; position: absolute; left: 0; top: .55rem;
+    width: 7px; height: 7px; border-radius: 2px; background: var(--pine);
+    transform: rotate(45deg);
+  }
+  .phase li b { color: var(--ink); font-weight: 700; }
+
+  /* ── 頁尾 ── */
+  .foot { padding: 2.6rem 0 3.4rem; color: var(--muted); font-size: .88rem; }
+  .foot p { color: var(--muted); font-size: .88rem; margin: 0 0 .5rem; }
+  .foot .rule { height: 1px; background: var(--line); margin: 0 0 1.6rem; }
+
+  @media (max-width: 620px) {
+    .assets { grid-template-columns: 1fr; }
+    .cover { padding: 3.2rem 0 2.2rem; }
+    .card-top { flex-direction: column; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .card, .asset, .phase { transition: transform .18s ease, box-shadow .18s ease; }
+    .card:hover, .asset:hover, .phase:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(28,37,35,.06), 0 16px 44px rgba(28,37,35,.1); }
+  }
+</style>
+
+<div class="page">
+  <header class="cover">
+    <div class="wrap">
+      <p class="eyebrow">資料安全與信任</p>
+      <h1>我們如何守護你<br>與個案之間的信任</h1>
+      <p class="lede">MindGym 給專業助人工作者夥伴的資料安全說明——我們保護什麼、現在做到了什麼、接下來要往哪裡走。</p>
+      <dl class="meta">
+        <div><dt>對象</dt><dd>合作之專業助人工作者</dd></div>
+        <div><dt>版本</dt><dd>v1.0</dd></div>
+        <div><dt>日期</dt><dd>2026 年 7 月 19 日</dd></div>
+        <div><dt>性質</dt><dd>活文件・隨系統更新</dd></div>
+      </dl>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- 1 -->
+    <section>
+      <div class="sec-head">
+        <span class="sec-num">1</span>
+        <h2>為什麼資訊安全重要？我們在保護什麼？<span class="sub">安全不是技術附加，而是這段助人關係能不能成立的前提</span></h2>
+      </div>
+      <p class="body-ink">心理工作的核心是信任。個案願意寫下最脆弱時刻的想法，是因為相信這些話會被安全地承接。一旦這份信任被辜負——資料外洩、被錯誤的人看到、危機沒有被接住——傷害的不只是隱私，而是這個人下一次還願不願意求助。因此，對我們而言，資訊安全與臨床倫理是同一件事的兩面。</p>
+      <p>具體來說，我們同時守護三個對象：</p>
+
+      <div class="assets">
+        <div class="asset">
+          <span class="tag">個案</span>
+          <h3>最脆弱時刻的文字</h3>
+          <p>感恩紀錄、練習內容、危機當下的自述——屬於高度敏感的個人資料，只應由本人與其明確同意的夥伴看見。</p>
+        </div>
+        <div class="asset">
+          <span class="tag">夥伴</span>
+          <h3>你的專業信譽與責任</h3>
+          <p>你把個案帶進平台，等於以專業背書。系統若出錯，責任會回到你身上。我們的職責，是讓你承擔的風險是可控、可解釋的。</p>
+        </div>
+        <div class="asset">
+          <span class="tag">關係</span>
+          <h3>匿名、同意與退出權</h3>
+          <p>誰能看到什麼、何時開始、何時結束，都應由個案掌握。安全機制做錯，破壞的正是這段關係賴以存在的基礎。</p>
+        </div>
+      </div>
+
+      <p>心理健康場域讓這件事格外關鍵：這裡的資料屬於法規上的特種／敏感個人資料；使用者往往正處於脆弱狀態；而任何一次外洩都可能造成「二次傷害」，其代價遠高於一般網路服務。這也是為什麼我們把安全設計放在資料庫最底層，而不是等到出事才補。</p>
+    </section>
+
+    <!-- 2 -->
+    <section>
+      <div class="sec-head">
+        <span class="sec-num">2</span>
+        <h2>我們現階段做了什麼？<span class="sub">以下每一項都已實際上線運作，而非規劃</span></h2>
+      </div>
+      <p>我們的原則是「預設拒絕」：系統預設誰都看不到別人的資料，只有在規則明確允許時才開放。這些規則寫在資料庫最底層強制執行，就算前端程式被繞過也擋得住。</p>
+
+      <div class="safeguards">
+
+        <div class="card">
+          <div class="card-top">
+            <h3>每個人預設只看得到自己的資料</h3>
+            <span class="chip done">已實作</span>
+          </div>
+          <p>每一張資料表都啟用了資料庫層級的存取控管（Row Level Security）。系統從登入憑證解出「你是誰」，並在回傳任何一筆資料前逐列比對——不是由前端宣稱身分。</p>
+          <p class="why"><b>對你的意義：</b>個案的紀錄不會因為某個網頁漏洞或改網址就外洩；保護是由資料庫本身強制，而非仰賴前端自律。</p>
+        </div>
+
+        <div class="card">
+          <div class="card-top">
+            <h3>同意才看得到，退出立即失效</h3>
+            <span class="chip done">已實作</span>
+          </div>
+          <p>個案輸入你的邀請碼、成為追蹤關係的那一刻，就是一次明確、可記錄時間的同意。你只能讀取「目前同意中」個案的練習紀錄、量表分數與危機警示。個案可以隨時單向終止追蹤，一旦終止，你會立即看不到其任何資料。</p>
+          <p class="why"><b>對你的意義：</b>知情同意不只是一句話，而是被寫進系統、可查證的機制；個案的退出權是真的、即時的。</p>
+        </div>
+
+        <div class="card">
+          <div class="card-top">
+            <h3>你的權限受控，無法被冒充或自行擴權</h3>
+            <span class="chip done">已實作</span>
+          </div>
+          <p>「專業夥伴」身分獨立存放、需經審核授予，並與一般帳號資料分離，任何人都無法透過修改自己的個人檔案來自我提權。所有敏感操作（審核、發布、危機處理）都走受控的資料庫程序，每一步都內建權限檢查。</p>
+          <p class="why"><b>對你的意義：</b>沒有人能假冒專業夥伴身分去偷看個案資料，權限邊界是系統強制、而非約定俗成。</p>
+        </div>
+
+        <div class="card">
+          <div class="card-top">
+            <h3>危機文字兩層偵測，寧可誤報、不可漏報</h3>
+            <span class="chip done">已實作</span>
+          </div>
+          <p>在專業模組中，個案寫下的內容會先經過關鍵字比對（零成本、即時），未命中再交由 AI 做語意判讀（含「告別、交代後事、覺得自己是負擔」等隱晦表達）。一旦判定有風險，系統會建立危機警示通知對應夥伴，並在個案端顯示求助資源。即使 AI 服務暫時中斷，仍有離線的關鍵字防線接手。</p>
+          <p class="why"><b>對你的意義：</b>你不必逐字盯著每一篇紀錄；高風險訊號會主動浮上來，讓你把注意力放在最需要的人身上。</p>
+        </div>
+
+        <div class="card">
+          <div class="card-top">
+            <h3>社群安全：檢舉、封鎖與匿名保護</h3>
+            <span class="chip done">已實作</span>
+          </div>
+          <p>公開社群支援檢舉冒犯內容與封鎖騷擾者。系統在設計上刻意不把匿名貼文背後的真實姓名回傳到前端，封鎖名單也只顯示當下看到的代號，避免因為封鎖動作反而暴露對方身分。</p>
+          <p class="why"><b>對你的意義：</b>個案在社群互動時受到保護，匿名性不會因為安全功能而被犧牲。</p>
+        </div>
+
+        <div class="card">
+          <div class="card-top">
+            <h3>每次連線都驗證身分、全程加密傳輸</h3>
+            <span class="chip done">已實作</span>
+          </div>
+          <p>後端每一個資料端點都會拿使用者的登入憑證向認證服務核實「這個 token 到底是誰」，驗證失敗即拒絕。所有連線走 HTTPS 加密傳輸。</p>
+          <p class="why"><b>對你的意義：</b>資料在往返途中不會被竊聽，且每一次存取都對應到一個經過驗證的真實身分。</p>
+        </div>
+
+        <div class="card">
+          <div class="card-top">
+            <h3>AI 使用全程記帳與監控</h3>
+            <span class="chip done">已實作</span>
+          </div>
+          <p>系統對每一次 AI 呼叫記錄用量與成本，作為異常使用的監控基礎，也讓我們能持續掌握 AI 服務的健康與花費。</p>
+          <p class="why"><b>對你的意義：</b>AI 相關功能是被持續盯著的，異常行為有跡可循。</p>
+        </div>
+
+      </div>
+
+      <div class="note">
+        <h4>關於透明度</h4>
+        <p>我們選擇對夥伴誠實：目前的危機偵測完整覆蓋「有追蹤關係」的專業模組，但公開社群那條線的即時偵測、以及部分 AI 服務的濫用防護與內容標示，仍在強化中。這些正是下一節短期路線的重點，我們不會等到出事才補。</p>
+      </div>
+    </section>
+
+    <!-- 3 -->
+    <section>
+      <div class="sec-head">
+        <span class="sec-num">3</span>
+        <h2>我們未來要做什麼？<span class="sub">分短、中、長期，讓保護與平台一起成長</span></h2>
+      </div>
+      <p>安全不是一次到位的工程，而是持續的承諾。以下是我們對夥伴的具體路線圖，會隨進度更新。</p>
+
+      <div class="roadmap">
+
+        <div class="phase">
+          <div class="phase-head">
+            <span class="phase-when">短期</span>
+            <span class="phase-range">1 – 3 個月</span>
+          </div>
+          <ul>
+            <li><b>公開社群接上危機偵測：</b>把目前僅在專業模組運作的危機辨識，延伸到公開貼文，讓脆弱訊號在任何地方都能被接住。</li>
+            <li><b>AI 內容明確標示：</b>所有 AI 生成的陪伴回饋都會清楚標註為「AI 回饋」，避免個案誤以為出自真人。</li>
+            <li><b>強化 AI 服務的濫用防護：</b>為對外的 AI 服務補上完整的登入驗證與逐人流量上限，防止被惡意大量呼叫。</li>
+            <li><b>危機警示更即時：</b>導入即時推播通知，並在夥伴端加入「已讀／處理中／已處理」的狀態追蹤。</li>
+          </ul>
+        </div>
+
+        <div class="phase">
+          <div class="phase-head">
+            <span class="phase-when">中期</span>
+            <span class="phase-range">3 – 6 個月</span>
+          </div>
+          <ul>
+            <li><b>存取稽核軌跡：</b>記錄「誰在何時看了哪一筆個案資料」，供夥伴與個案查閱，讓存取行為可被課責。</li>
+            <li><b>個案資料可攜與刪除權：</b>提供資料匯出與徹底刪除（被遺忘權），把資料的最終控制權交還個案。</li>
+            <li><b>危機事件標準流程與備援：</b>建立明確的處理 SOP 與升級路徑，當第一線夥伴無法及時回應時有備援機制。</li>
+            <li><b>敏感文字的應用層加密：</b>對自由書寫欄位加上額外一層加密，即使資料庫層被觸及也難以直接讀取內容。</li>
+            <li><b>委外第三方安全稽核：</b>邀請獨立資安團隊進行滲透測試，讓保護不只靠內部自評。</li>
+          </ul>
+        </div>
+
+        <div class="phase">
+          <div class="phase-head">
+            <span class="phase-when">長期</span>
+            <span class="phase-range">6 – 12 個月以上</span>
+          </div>
+          <ul>
+            <li><b>法遵與治理框架：</b>對接個人資料保護法／（若涉及跨境使用者）GDPR 等規範，釐清資料跨境傳輸，並設立資料保護角色（DPO）。</li>
+            <li><b>危機轉介網絡：</b>與真實的危機專線與在地資源串接，讓「偵測到風險」能延伸為「連上專業協助」。</li>
+            <li><b>夥伴分級與督導層級：</b>支援更細緻的權限分層與督導關係，貼近實際的助人團隊結構。</li>
+            <li><b>常態安全治理：</b>建立事件應變計畫與漏洞回報機制，把安全變成一種持續運作的日常，而非事件驅動。</li>
+          </ul>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="foot">
+    <div class="wrap">
+      <div class="rule"></div>
+      <p>本文件為活文件，將隨系統演進持續更新；如與實際功能有出入，以最新版本為準。</p>
+      <p>對本說明有任何疑問，或希望進一步了解特定機制的細節，歡迎與我們的團隊聯繫。</p>
+      <p style="margin-top:1rem; color:var(--pine); font-weight:700;">MindGym・健心房　—　與你一起，把信任守好</p>
+    </div>
+  </footer>
+</div>
