@@ -28,6 +28,8 @@ export const home: Record<string, Translation> = {
   '連結力 · 意義力': { 'zh-CN': '连结力 · 意义力', en: 'Relationships · Meaning' },
   '情緒力 · 投入力': { 'zh-CN': '情绪力 · 投入力', en: 'Positive Emotion · Engagement' },
   '意義力 · 成就力': { 'zh-CN': '意义力 · 成就力', en: 'Meaning · Accomplishment' },
+  '成就力 · 投入力': { 'zh-CN': '成就力 · 投入力', en: 'Accomplishment · Engagement' },
+  '新上架 · 成就力 · 投入力': { 'zh-CN': '新上架 · 成就力 · 投入力', en: 'New · Accomplishment · Engagement' },
   '新上架 · 找回你的專注狀態': { 'zh-CN': '新上架 · 找回你的专注状态', en: 'New · Reclaim Your Focus' },
   '即將上架 · 情緒力 · 成就力': { 'zh-CN': '即将上架 · 情绪力 · 成就力', en: 'Coming Soon · Positive Emotion · Accomplishment' },
   '即將上架 · 連結力 · 意義力': { 'zh-CN': '即将上架 · 连结力 · 意义力', en: 'Coming Soon · Relationships · Meaning' },
