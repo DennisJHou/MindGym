@@ -100,6 +100,17 @@ const modules = [
     featured: true,
   },
   {
+    name: 'WOOP 目標實踐',
+    meta: '初階·五分鐘',
+    to: '/app/woop' as const,
+    searchName: 'WOOP 目標實踐',
+    locked: false,
+    featured: false,
+    img: woopCover,
+    imgPosition: 'left' as const,
+    badge: '新上架',
+  },
+  {
     name: '自我慈悲',
     meta: '初階·五分鐘',
     to: '/app/self-compassion' as const,
@@ -139,17 +150,6 @@ const modules = [
     featured: false,
     img: mindfulnessCover,
     imgPosition: 'center' as const,
-  },
-  {
-    name: 'WOOP 目標實踐',
-    meta: '初階·五分鐘',
-    to: '/app/woop' as const,
-    searchName: 'WOOP 目標實踐',
-    locked: false,
-    featured: false,
-    img: woopCover,
-    imgPosition: 'left' as const,
-    badge: '新上架',
   },
 ]
 
@@ -1204,6 +1204,13 @@ function TrainingCenter({ recommendation, userId }: { recommendation: Recommenda
       {activeTab === 'new' && (
         <div className="flex flex-col gap-3">
           <ExerciseCard
+            to="/app/woop"
+            img={woopIcon}
+            name="WOOP 目標實踐地圖"
+            meta="新上架 · 成就力 · 投入力"
+            badge="NEW"
+          />
+          <ExerciseCard
             to="/app/process-goal"
             img={processGoalIcon}
             name="過程目標覺察"
@@ -1228,13 +1235,6 @@ function TrainingCenter({ recommendation, userId }: { recommendation: Recommenda
             name="正念冥想"
             meta="即將上架 · 情緒力 · 投入力"
             locked
-          />
-          <ExerciseCard
-            to="/app/woop"
-            img={woopIcon}
-            name="WOOP 目標實踐地圖"
-            meta="新上架 · 成就力 · 投入力"
-            badge="NEW"
           />
         </div>
       )}
