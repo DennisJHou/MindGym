@@ -8,6 +8,7 @@ import { hasSeenWelcome } from '../lib/welcomeSeen'
 import { checkAndGenerateReviews } from '../lib/reviews'
 import { isoLocalDate } from '../lib/date'
 import { ProModuleSection } from '../components/pro/ProModuleSection'
+import { WoopReminderCard } from '../components/WoopReminderCard'
 import { useLanguage } from '../lib/i18n/context'
 import homeMascot from '../assets/ui/home-mascot.png'
 import gratitudeMascot from '../assets/ui/gratitude-mascot.png'
@@ -142,12 +143,13 @@ const modules = [
   {
     name: 'WOOP 目標實踐',
     meta: '初階·五分鐘',
-    to: '/app/placeholder' as const,
+    to: '/app/woop' as const,
     searchName: 'WOOP 目標實踐',
-    locked: true,
+    locked: false,
     featured: false,
     img: woopCover,
     imgPosition: 'left' as const,
+    badge: '新上架',
   },
 ]
 
@@ -186,6 +188,10 @@ function HomePage() {
           {t('{name}，今天想練哪塊心理肌肉？', { name: userName })}
         </h1>
       </div>
+
+      {/* 你今天的 If-Then（有設定今天的 WOOP 才會出現）：使用者對自己的承諾，
+          排在標題正下方、跑馬燈之前，比任何系統推薦都優先。 */}
+      <WoopReminderCard userId={userId} />
 
       {/* 健心訓練模組—大卡、左右滑動 */}
       <SectionTitle zh={t('PSY by PSY 健心訓練模組')} />
@@ -862,7 +868,7 @@ type PracticeDef = {
   key: SchedulePracticeKey
   name: string
   meta: string
-  to?: '/app/gratitude' | '/app/process-goal' | '/app/self-compassion'
+  to?: '/app/gratitude' | '/app/process-goal' | '/app/self-compassion' | '/app/woop'
   img?: string
   locked: boolean
 }
@@ -873,7 +879,7 @@ const PRACTICE_CATALOG: PracticeDef[] = [
   { key: 'three-good-things', name: '三件好事', meta: '情緒力 · 成就力', img: threeGoodThingsIcon, locked: true },
   { key: 'self-compassion', name: '自我慈悲', meta: '連結力 · 意義力', to: '/app/self-compassion', img: selfCompassionIcon, locked: false },
   { key: 'mindfulness', name: '正念冥想', meta: '情緒力 · 投入力', img: mindfulnessIcon, locked: true },
-  { key: 'woop', name: 'WOOP 目標實踐地圖', meta: '意義力 · 成就力', img: woopIcon, locked: true },
+  { key: 'woop', name: 'WOOP 目標實踐地圖', meta: '成就力 · 投入力', to: '/app/woop', img: woopIcon, locked: false },
 ]
 
 const PRACTICE_MAP = new Map(PRACTICE_CATALOG.map((p) => [p.key, p]))
@@ -1224,10 +1230,11 @@ function TrainingCenter({ recommendation, userId }: { recommendation: Recommenda
             locked
           />
           <ExerciseCard
+            to="/app/woop"
             img={woopIcon}
             name="WOOP 目標實踐地圖"
-            meta="即將上架 · 意義力 · 成就力"
-            locked
+            meta="新上架 · 成就力 · 投入力"
+            badge="NEW"
           />
         </div>
       )}

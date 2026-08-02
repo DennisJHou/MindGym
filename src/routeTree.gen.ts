@@ -21,6 +21,7 @@ import { Route as LoginImport } from './routes/login'
 import { Route as AppImport } from './routes/app'
 import { Route as AdminImport } from './routes/admin'
 import { Route as IndexImport } from './routes/index'
+import { Route as AppWoopImport } from './routes/app.woop'
 import { Route as AppWeeklyReviewImport } from './routes/app.weekly-review'
 import { Route as AppSelfCompassionImport } from './routes/app.self-compassion'
 import { Route as AppProfileImport } from './routes/app.profile'
@@ -95,6 +96,12 @@ const IndexRoute = IndexImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRoute,
+} as any)
+
+const AppWoopRoute = AppWoopImport.update({
+  id: '/woop',
+  path: '/woop',
+  getParentRoute: () => AppRoute,
 } as any)
 
 const AppWeeklyReviewRoute = AppWeeklyReviewImport.update({
@@ -305,6 +312,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppWeeklyReviewImport
       parentRoute: typeof AppImport
     }
+    '/app/woop': {
+      id: '/app/woop'
+      path: '/woop'
+      fullPath: '/app/woop'
+      preLoaderRoute: typeof AppWoopImport
+      parentRoute: typeof AppImport
+    }
     '/app/pro-module/$moduleId': {
       id: '/app/pro-module/$moduleId'
       path: '/pro-module/$moduleId'
@@ -354,6 +368,7 @@ interface AppRouteChildren {
   AppProfileRoute: typeof AppProfileRoute
   AppSelfCompassionRoute: typeof AppSelfCompassionRoute
   AppWeeklyReviewRoute: typeof AppWeeklyReviewRoute
+  AppWoopRoute: typeof AppWoopRoute
   AppProModuleModuleIdRoute: typeof AppProModuleModuleIdRoute
   AppWorkshopAuthenticSelfRoute: typeof AppWorkshopAuthenticSelfRoute
   AppWorkshopLastDayRoute: typeof AppWorkshopLastDayRoute
@@ -370,6 +385,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppProfileRoute: AppProfileRoute,
   AppSelfCompassionRoute: AppSelfCompassionRoute,
   AppWeeklyReviewRoute: AppWeeklyReviewRoute,
+  AppWoopRoute: AppWoopRoute,
   AppProModuleModuleIdRoute: AppProModuleModuleIdRoute,
   AppWorkshopAuthenticSelfRoute: AppWorkshopAuthenticSelfRoute,
   AppWorkshopLastDayRoute: AppWorkshopLastDayRoute,
@@ -398,6 +414,7 @@ export interface FileRoutesByFullPath {
   '/app/profile': typeof AppProfileRoute
   '/app/self-compassion': typeof AppSelfCompassionRoute
   '/app/weekly-review': typeof AppWeeklyReviewRoute
+  '/app/woop': typeof AppWoopRoute
   '/app/pro-module/$moduleId': typeof AppProModuleModuleIdRoute
   '/app/workshop/authentic-self': typeof AppWorkshopAuthenticSelfRoute
   '/app/workshop/last-day': typeof AppWorkshopLastDayRoute
@@ -424,6 +441,7 @@ export interface FileRoutesByTo {
   '/app/profile': typeof AppProfileRoute
   '/app/self-compassion': typeof AppSelfCompassionRoute
   '/app/weekly-review': typeof AppWeeklyReviewRoute
+  '/app/woop': typeof AppWoopRoute
   '/app/pro-module/$moduleId': typeof AppProModuleModuleIdRoute
   '/app/workshop/authentic-self': typeof AppWorkshopAuthenticSelfRoute
   '/app/workshop/last-day': typeof AppWorkshopLastDayRoute
@@ -451,6 +469,7 @@ export interface FileRoutesById {
   '/app/profile': typeof AppProfileRoute
   '/app/self-compassion': typeof AppSelfCompassionRoute
   '/app/weekly-review': typeof AppWeeklyReviewRoute
+  '/app/woop': typeof AppWoopRoute
   '/app/pro-module/$moduleId': typeof AppProModuleModuleIdRoute
   '/app/workshop/authentic-self': typeof AppWorkshopAuthenticSelfRoute
   '/app/workshop/last-day': typeof AppWorkshopLastDayRoute
@@ -479,6 +498,7 @@ export interface FileRouteTypes {
     | '/app/profile'
     | '/app/self-compassion'
     | '/app/weekly-review'
+    | '/app/woop'
     | '/app/pro-module/$moduleId'
     | '/app/workshop/authentic-self'
     | '/app/workshop/last-day'
@@ -504,6 +524,7 @@ export interface FileRouteTypes {
     | '/app/profile'
     | '/app/self-compassion'
     | '/app/weekly-review'
+    | '/app/woop'
     | '/app/pro-module/$moduleId'
     | '/app/workshop/authentic-self'
     | '/app/workshop/last-day'
@@ -529,6 +550,7 @@ export interface FileRouteTypes {
     | '/app/profile'
     | '/app/self-compassion'
     | '/app/weekly-review'
+    | '/app/woop'
     | '/app/pro-module/$moduleId'
     | '/app/workshop/authentic-self'
     | '/app/workshop/last-day'
@@ -602,6 +624,7 @@ export const routeTree = rootRoute
         "/app/profile",
         "/app/self-compassion",
         "/app/weekly-review",
+        "/app/woop",
         "/app/pro-module/$moduleId",
         "/app/workshop/authentic-self",
         "/app/workshop/last-day",
@@ -660,6 +683,10 @@ export const routeTree = rootRoute
     },
     "/app/weekly-review": {
       "filePath": "app.weekly-review.tsx",
+      "parent": "/app"
+    },
+    "/app/woop": {
+      "filePath": "app.woop.tsx",
       "parent": "/app"
     },
     "/app/pro-module/$moduleId": {

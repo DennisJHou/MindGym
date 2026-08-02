@@ -439,18 +439,23 @@ function IntroStage({ onGoBack, onStart }: { onGoBack: () => void; onStart: () =
         {t('自我慈悲，是練習用對待好朋友的溫柔，來對待正在經歷困難的自己。這個練習包含三個核心元素，讓我們先花一點時間認識它們。')}
       </div>
 
-      {/* 理論說明：三個核心元素常駐露出，相關文獻由「查看更多」展開（三個練習共用版型） */}
+      {/* 三個核心元素常駐露出（標籤＋標題永遠可見，說明文字先露出兩行），
+          完整說明與相關文獻由「查看更多」展開——與感恩日記／過程目標覺察同一版型。 */}
       <TheorySection>
         {(expanded) => (
           <>
-            <div className="flex flex-col gap-3.5">
+            <div className="flex flex-col gap-2.5">
               {cards.map((card) => (
-                <div key={card.key} className="rounded-3xl bg-card p-4 shadow-soft">
-                  <span className={`inline-block rounded-full ${card.tileClass} px-3.5 py-1.5 text-sm font-extrabold tracking-[0.05em] text-foreground/80`}>
-                    {card.tag}
-                  </span>
-                  <p className="mt-2 text-base font-extrabold text-foreground">{card.title}</p>
-                  <p className="mt-1.5 text-sm leading-relaxed text-foreground/75">{card.body}</p>
+                <div key={card.key} className="rounded-2xl bg-card p-4 shadow-soft">
+                  <div className="flex items-center gap-2.5">
+                    <span className={`shrink-0 rounded-full ${card.tileClass} px-3 py-1 text-xs font-extrabold tracking-[0.05em] text-foreground/80`}>
+                      {card.tag}
+                    </span>
+                    <p className="text-[15px] font-extrabold text-foreground">{card.title}</p>
+                  </div>
+                  <p className={`mt-2 text-sm leading-relaxed text-foreground/75 ${expanded ? '' : 'line-clamp-2'}`}>
+                    {card.body}
+                  </p>
                 </div>
               ))}
             </div>

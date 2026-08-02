@@ -182,6 +182,88 @@ export const workshop: Record<string, Translation> = {
   '開始 WOOP': { 'zh-CN': '开始 WOOP', en: 'Start WOOP' },
   '即時預覽': { 'zh-CN': '即时预览', en: 'Live Preview' },
 
+  // ─── app.woop.tsx（一般開放版，非工作坊限定） ────────────────────────
+  '你今天 WOOP 了嗎？': { 'zh-CN': '你今天 WOOP 了吗？', en: 'Have You WOOP’d Today?' },
+  '什麼時候可以用 WOOP？': { 'zh-CN': '什么时候可以用 WOOP？', en: 'When Can You Use WOOP?' },
+  '鼓勵你每天早上起來，先 WOOP 一下今天最重要要完成的一件事情是什麼。你也可以在睡覺以前，先想清楚明天希望完成的一件事。': {
+    'zh-CN': '鼓励你每天早上起来，先 WOOP 一下今天最重要要完成的一件事情是什么。你也可以在睡觉以前，先想清楚明天希望完成的一件事。',
+    en: 'Each morning, try WOOP-ing the single most important thing you want to get done that day. You can also do it before bed, to get clear on the one thing you want to accomplish tomorrow.',
+  },
+  '心態提醒': { 'zh-CN': '心态提醒', en: 'A Note on Mindset' },
+  'WOOP 並不是要你強迫自己設定很多、很高、很艱難、很長遠的目標，而更是你每一天日常生活的目標，這個目標是非常小、非常具體的。可以是工作中很重要的一件事情或待辦事項、也可以是生活中很重要的一個習慣培養；也可以是你近期想要改變自己的一個小目標行動。': {
+    'zh-CN': 'WOOP 并不是要你强迫自己设定很多、很高、很艰难、很长远的目标，而更是你每一天日常生活的目标，这个目标是非常小、非常具体的。可以是工作中很重要的一件事情或待办事项、也可以是生活中很重要的一个习惯培养；也可以是你近期想要改变自己的一个小目标行动。',
+    en: 'WOOP isn’t about forcing yourself to set lots of lofty, difficult, far-off goals. It’s about the goals of your everyday life — goals that are very small and very concrete. It could be one important task at work, an important habit you’re building in daily life, or a small action you want to take to change something about yourself lately.',
+  },
+  '如果當天沒有順利完成，鼓勵你不要灰心。WOOP 並不是用來放大自己不足的工具，而是幫助你想清楚每一天的人生目標感；比起漫無目的的生活，我們只是多了一小份對每一天為何而活、為什麼而努力的小覺察。': {
+    'zh-CN': '如果当天没有顺利完成，鼓励你不要灰心。WOOP 并不是用来放大自己不足的工具，而是帮助你想清楚每一天的人生目标感；比起漫无目的的生活，我们只是多了一小份对每一天为何而活、为什么而努力的小觉察。',
+    en: 'If it doesn’t work out on a given day, don’t be discouraged. WOOP isn’t a tool for magnifying your shortcomings — it’s there to help you get clear on a sense of purpose for each day. Compared with drifting through life, we simply gain a small awareness of what we’re living for and why we’re making the effort.',
+  },
+  '你近期最想完成的一件事': { 'zh-CN': '你近期最想完成的一件事', en: 'The one thing you most want to achieve lately' },
+  '想像完成後的具體樣貌': { 'zh-CN': '想象完成后的具体样貌', en: 'Picture concretely what it looks like once done' },
+  '思考可能的阻礙或困難': { 'zh-CN': '思考可能的阻碍或困难', en: 'Think through the obstacles or difficulties ahead' },
+  '制定你的 If-Then 因應策略': { 'zh-CN': '制定你的 If-Then 应对策略', en: 'Create your If-Then coping strategy' },
+  '依序完成 W／O／O／P 四段小小書寫': {
+    'zh-CN': '依序完成 W／O／O／P 四段小小书写',
+    en: 'Complete four short pieces of writing — W／O／O／P — in order',
+  },
+  '完成後可下載你的 WOOP 地圖': { 'zh-CN': '完成后可下载你的 WOOP 地图', en: 'Download your WOOP map when you’re done' },
+  '設定每天的小目標，幫助你增加每天的人生目標感': {
+    'zh-CN': '设定每天的小目标，帮助你增加每天的人生目标感',
+    en: 'Set a small goal each day to build a stronger sense of purpose',
+  },
+  '把你的 WOOP 地圖分享出去': { 'zh-CN': '把你的 WOOP 地图分享出去', en: 'Share Your WOOP Map' },
+  '分享你的目標與應對計畫，讓夥伴一起為你加油，也彼此督促前進。': {
+    'zh-CN': '分享你的目标与应对计划，让伙伴一起为你加油，也彼此督促前进。',
+    en: 'Share your goal and your coping plan so others can cheer you on — and you can keep each other moving forward.',
+  },
+  '你今天的 If-Then': { 'zh-CN': '你今天的 If-Then', en: 'Your If-Then for today' },
+  'Bouba 想跟你說…': { 'zh-CN': 'Bouba 想跟你说…', en: 'Bouba is thinking…' },
+  'Bouba 想跟你說': { 'zh-CN': 'Bouba 想跟你说', en: 'A note from Bouba' },
+  'Bouba 的口袋方案': { 'zh-CN': 'Bouba 的口袋方案', en: 'Bouba’s backup ideas' },
+  '收合口袋方案': { 'zh-CN': '收合口袋方案', en: 'Hide backup ideas' },
+  '加入我的備案': { 'zh-CN': '加入我的备案', en: 'Add as backup' },
+  '已加入備案': { 'zh-CN': '已加入备案', en: 'Added' },
+  '備案': { 'zh-CN': '备案', en: 'Backup plans' },
+  '今天做到了': { 'zh-CN': '今天做到了', en: 'Done for today' },
+  '今天做到了！': { 'zh-CN': '今天做到了！', en: 'Done today!' },
+  '我想設定的是': { 'zh-CN': '我想设定的是', en: 'I’m setting a goal for' },
+  '明天': { 'zh-CN': '明天', en: 'Tomorrow' },
+  '今天的目標': { 'zh-CN': '今天的目标', en: 'Today’s goal' },
+  '明天的目標': { 'zh-CN': '明天的目标', en: 'Tomorrow’s goal' },
+  '{date}的目標': { 'zh-CN': '{date}的目标', en: 'Goal for {date}' },
+  '目標日期：{date}': { 'zh-CN': '目标日期：{date}', en: 'Target date: {date}' },
+  '選擇目標日期': { 'zh-CN': '选择目标日期', en: 'Choose a target date' },
+  '你今天最想完成的習慣／採取的行動是什麼？': {
+    'zh-CN': '你今天最想完成的习惯／采取的行动是什么？',
+    en: 'What habit or action do you most want to accomplish today?',
+  },
+  '你明天最想完成的習慣／採取的行動是什麼？': {
+    'zh-CN': '你明天最想完成的习惯／采取的行动是什么？',
+    en: 'What habit or action do you most want to accomplish tomorrow?',
+  },
+  '發佈': { 'zh-CN': '发布', en: 'Publish' },
+  '尚未登入，無法發佈。': { 'zh-CN': '尚未登录，无法发布。', en: 'Not signed in yet — can’t publish.' },
+  '這個目標可以是一天中很小的目標，重點是你「發自內心希望自己完成的重要事項」或「目前較難做到」的一件事。': {
+    'zh-CN': '这个目标可以是一天中很小的目标，重点是你「发自内心希望自己完成的重要事项」或「目前较难做到」的一件事。',
+    en: 'This can be a very small goal within a single day. What matters is that it’s something you genuinely want to accomplish — or something you currently find hard to do.',
+  },
+  '請在腦海中想像自己完成後的模樣。那是什麼感受？你會變成怎樣或得到什麼？那是一個怎樣的狀態？你怎樣看待這樣的自己？': {
+    'zh-CN': '请在脑海中想象自己完成后的模样。那是什么感受？你会变成怎样或得到什么？那是一个怎样的状态？你怎样看待这样的自己？',
+    en: 'Picture yourself once it’s done. How does it feel? What do you become, or what do you gain? What state are you in? How do you see yourself then?',
+  },
+  '把目標想成看得見的畫面，讓你更容易真正投入其中。': {
+    'zh-CN': '把目标想成看得见的画面，让你更容易真正投入其中。',
+    en: 'Turning the goal into a vivid picture makes it far easier to truly engage with it.',
+  },
+  '想清楚今天為什麼而努力，讓每一天多一份方向感。': {
+    'zh-CN': '想清楚今天为什么而努力，让每一天多一份方向感。',
+    en: 'Getting clear on why you’re making the effort today gives each day a stronger sense of direction.',
+  },
+  'If-Then 計畫讓行動在關鍵時刻自動啟動，大幅提高完成率。': {
+    'zh-CN': 'If-Then 计划让行动在关键时刻自动启动，大幅提高完成率。',
+    en: 'An If-Then plan triggers action automatically at the critical moment, substantially raising your completion rate.',
+  },
+
   // ─── app.workshop.authentic-self.tsx ────────────────────────────────
   '工作・第 1 件': { 'zh-CN': '工作・第 1 件', en: 'Work · Item 1' },
   '工作・第 2 件': { 'zh-CN': '工作・第 2 件', en: 'Work · Item 2' },
