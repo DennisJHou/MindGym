@@ -226,6 +226,7 @@ export const workshop: Record<string, Translation> = {
   '備案': { 'zh-CN': '备案', en: 'Backup plans' },
   '今天做到了': { 'zh-CN': '今天做到了', en: 'Done for today' },
   '今天做到了！': { 'zh-CN': '今天做到了！', en: 'Done today!' },
+  '今天完成了！': { 'zh-CN': '今天完成了！', en: 'Completed today!' },
   '我想設定的是': { 'zh-CN': '我想设定的是', en: 'I’m setting a goal for' },
   '明天': { 'zh-CN': '明天', en: 'Tomorrow' },
   '今天的目標': { 'zh-CN': '今天的目标', en: 'Today’s goal' },

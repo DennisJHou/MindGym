@@ -1502,7 +1502,7 @@ function practiceTag(practiceType: string | null): { label: string; tile: string
       return { label: '生命最後一天', tile: 'bg-tile-peach' }
     case 'workshop_woop':
     case 'woop':
-      return { label: 'WOOP 目標實踐地圖', tile: 'bg-tile-lemon' }
+      return { label: 'WOOP 目標實踐', tile: 'bg-tile-lemon' }
     case 'pro_module':
       return { label: '專業模組', tile: 'bg-tile-peach' }
     default:

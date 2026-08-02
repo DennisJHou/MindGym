@@ -152,6 +152,10 @@ export const profile: Record<string, Translation> = {
     en: "✓ We'll remind you to check back on Sunday",
   },
   '感恩 {n1} 次 · 過程 {n2} 次': { 'zh-CN': '感恩 {n1} 次 · 过程 {n2} 次', en: '{n1}x gratitude · {n2}x process' },
+  '感恩 {n1} 次 · 過程 {n2} 次 · 慈悲 {n3} 次 · WOOP {n4} 次': {
+    'zh-CN': '感恩 {n1} 次 · 过程 {n2} 次 · 慈悲 {n3} 次 · WOOP {n4} 次',
+    en: '{n1}x gratitude · {n2}x process · {n3}x self-compassion · {n4}x WOOP',
+  },
   '看看這週的健心狀況': { 'zh-CN': '看看这周的健心状况', en: "See how your week's been going" },
   '返回': { 'zh-CN': '返回', en: 'Back' },
   '這週還沒有紀錄': { 'zh-CN': '这周还没有纪录', en: 'No entries yet this week' },
