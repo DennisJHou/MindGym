@@ -193,6 +193,62 @@ export async function scheduleWeeklyReviewReminder(): Promise<void> {
   }
 }
 
+// WOOP 目標日提醒：固定 id 區段 4000+hash(entryId)%1000，一次性（不像打卡提醒
+// 每天重複）——只在使用者設定的那個目標日早上 8:00 響一次。
+//
+// 內容就是使用者自己寫的 If-Then 原句，一字不改：2025 年 Sheeran, Listrom &
+// Gollwitzer 的 642 篇 meta-analysis 發現「複誦過的計畫」效果更大，推播本身
+// 就是一次複誦，不需要（也不該）由我們幫他改寫或加油打氣。
+const WOOP_REMINDER_HOUR = 8
+const WOOP_REMINDER_MINUTE = 0
+
+function hashEntryId(entryId: string): number {
+  let h = 0
+  for (let i = 0; i < entryId.length; i++) h = (h * 31 + entryId.charCodeAt(i)) | 0
+  return Math.abs(h) % 1000
+}
+
+function woopReminderId(entryId: string): number {
+  return 4000 + hashEntryId(entryId)
+}
+
+/**
+ * 排一則單次的 WOOP 提醒，在 targetDate 那天早上 8:00 跳出。
+ * targetDate 是 YYYY-MM-DD（本地時區）；若該時間已過（例如當天 8 點後才設定
+ * 「今天」的目標）就不排，避免 Capacitor 對過去時間排程报错或直接不觸發。
+ */
+export async function scheduleWoopReminder(entryId: string, ifThenText: string, targetDate: string): Promise<void> {
+  if (!(await ensureLocalNotifPermission())) return
+  const [y, m, d] = targetDate.split('-').map(Number)
+  if (!y || !m || !d) return
+  const at = new Date(y, m - 1, d, WOOP_REMINDER_HOUR, WOOP_REMINDER_MINUTE, 0, 0)
+  if (at.getTime() <= Date.now()) return
+  const id = woopReminderId(entryId)
+  try {
+    await LocalNotifications.cancel({ notifications: [{ id }] })
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id,
+          title: 'PSY by PSY · WOOP',
+          body: ifThenText,
+          schedule: { at, allowWhileIdle: true },
+        },
+      ],
+    })
+  } catch (e) {
+    console.error('[localNotif] scheduleWoopReminder', errDetail(e))
+  }
+}
+
+export async function cancelWoopReminder(entryId: string): Promise<void> {
+  try {
+    await LocalNotifications.cancel({ notifications: [{ id: woopReminderId(entryId) }] })
+  } catch (e) {
+    console.error('[localNotif] cancelWoopReminder', errDetail(e))
+  }
+}
+
 // 立即送出一則本地通知（用於偵測到新的按讚／留言時）。
 export async function pushLocalNotification(title: string, body: string): Promise<void> {
   if (!(await ensureLocalNotifPermission())) return

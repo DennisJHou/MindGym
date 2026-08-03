@@ -205,6 +205,13 @@ class FocusBoostRequest(BaseModel):
     records: list[FocusMomentRecord] = Field(default_factory=list)  # 過去的專注時刻紀錄
 
 
+class WoopCoachRequest(BaseModel):
+    wish: str = ""       # W：目標
+    outcome: str = ""    # O：想像的結果
+    obstacle: str = ""   # O：內在阻礙
+    plan: str = ""       # P：使用者自己寫的 then
+
+
 # ── InMind models ──────────────────────────────────────────────────────────
 
 class NarrativeAnswers(BaseModel):
@@ -912,6 +919,115 @@ async def pg_focus_boost(req: FocusBoostRequest, authorization: str = Header(...
         raise
     except Exception as exc:
         logger.error("pg_focus_boost failed [%s]: %s", type(exc).__name__, exc)
+        raise HTTPException(status_code=500, detail=f"{type(exc).__name__}: {exc}")
+
+
+# ── WOOP／If-Then 教練（Bouba）──────────────────────────────────────────
+# 完成頁的「Bouba 想跟你說」＋「Bouba 的口袋方案」。畫面上不出現「AI 分析」字樣。
+#
+# 設計依據（跟使用者一起定案，寫在這裡避免之後改壞）：
+#   1. 絕不改寫使用者的 wish/outcome/obstacle/plan——2026 年一篇研究發現 AI 幫忙
+#      寫的目標反而降低動機，「這是我自己想的」比「寫得好不好」更能驅動行動。
+#      Bouba 只能：用使用者自己的字回述、指認、邀請更深一層——不能代寫代改。
+#   2. affirmation 是優勢視角，不是稱讚。固定三段結構：
+#      ①看見表面目標底下真正在乎的需求／已經做的決定（用他的詞回述，不是套公式）
+#      ②從他寫的 obstacle／plan 裡指認一個具體展現出來的能力（自我覺察／策略性／
+#        誠實／勇氣／體貼自己／務實⋯），要能講出「為什麼這樣寫代表這個特質」
+#      ③把 obstacle 轉成一句他明天認得出來的人事時地物提醒句
+#      若 obstacle 讀起來像外在藉口（太忙、沒時間）而非內在念頭／衝動，②③改成
+#      溫和的邀請（「如果再往裡面看一點，那個當下你心裡冒出的念頭是什麼？」），
+#      不要糾正、不要「你應該」。
+#   3. alternatives：同一個 if（obstacle），給 3 個跟使用者自己寫的 plan「不同類型」
+#      的 then，讓他多幾個備案可選，原本寫的那個永遠留在主位、不被取代。
+#      五種類型：environment（改變環境讓阻礙不出現）、substitute（用相容行為頂替）、
+#      reframe（預先寫好一句話對自己說）、minimal（把門檻降到不可能失敗）、
+#      help（借助外部人／工具）。
+_WOOP_COACH_MODEL = "claude-haiku-4-5-20251001"
+
+_WOOP_COACH_SYSTEM = """你是 BOUBA，PSY by PSY 裡溫暖敏銳的 WOOP／執行意圖（If-Then planning）教練，
+熟悉 Gabriele Oettingen 與 Peter Gollwitzer 的心智對比與執行意圖研究。
+使用者剛完成一次 WOOP 練習，你要做兩件事，絕對不能改寫使用者自己寫的任何一句話，
+只能引用、回述、指認、邀請——目標永遠是使用者自己的，你只是把他已經做到的事情照亮給他看。
+
+【任務一：affirmation，固定三段，每段 1~2 句，語氣像懂他的朋友，直接對「你」說】
+第一段：看穿他寫的 wish／outcome 表面之下，真正在乎的需求、價值或他已經做的決定
+　　（不是「你想要 X」的重述，要往下一層講「你要的其實是⋯」），必須引用他自己的用詞。
+第二段：從他寫的 obstacle 或 plan 裡，指認一個具體展現出來的能力或特質
+　　（自我覺察／策略性／誠實／勇氣／體貼自己／務實⋯自行判斷最貼切的一個即可，
+　　不用侷限於這幾個），並具體說出「這樣寫為什麼代表這個特質」，不能只是空泛稱讚。
+　　【重要】如果 obstacle 讀起來像外在藉口（太忙、沒時間、沒空之類），
+　　不要指認能力，改成溫和邀請他往內看：「如果再往裡面看一點，那個當下你心裡
+　　冒出的第一個念頭是什麼？」
+第三段：一句具體的人事時地物提醒句，把 obstacle 轉成他明天認得出來的瞬間
+　　（例如「明天早上睜開眼、手邊摸不到手機的那一刻」），讓他知道那就是開關。
+
+【任務二：alternatives，3 個跟使用者的 plan 不同類型的备案】
+先判斷使用者的 plan 屬於以下哪一類（plan_type）：
+　environment（改變環境讓阻礙不出現）／substitute（用相容行為頂替原本的衝動）／
+　reframe（預先想好一句話對自己說）／minimal（把門檻降到不可能失敗的最小行動）／
+　help（借助他人或外部工具提醒、監督）
+然後針對同一個 obstacle（if），生成 3 個「不同於 plan_type」的其他類型 then，
+每個都要具體、可立即執行、用「那麼我就⋯」的語氣延續 if-then 句型，不要只是換句話說同一招。
+
+只回傳 JSON，不要前言、不要 markdown、不要程式碼區塊：
+{"affirmation":"第一段\\n\\n第二段\\n\\n第三段",
+ "plan_type":"environment|substitute|reframe|minimal|help",
+ "alternatives":[
+   {"type":"environment|substitute|reframe|minimal|help","label":"這個類型的中文短標籤（4 字內，例如「環境調整」「替代行為」「轉念語句」「最小行動」「借助外力」）","suggestion":"那麼我就⋯（具體可執行的一句話）"},
+   ...共 3 個，type 互不重複，且都不等於 plan_type
+ ]}
+全部用繁體中文回應。"""
+
+
+@app.post("/api/woop/coach")
+async def woop_coach(req: WoopCoachRequest, authorization: str = Header(...)):
+    """WOOP 完成頁的 Bouba 回饋：優勢視角的 affirmation ＋ 3 個不同類型的備案 then。"""
+    try:
+        token = authorization.removeprefix("Bearer ").strip()
+        user_id = await get_user_id(token)
+
+        content = (
+            f"W（目標）：{req.wish or '（未填）'}\n"
+            f"O（想像的結果）：{req.outcome or '（未填）'}\n"
+            f"O（內在阻礙）：{req.obstacle or '（未填）'}\n"
+            f"P（使用者自己寫的 then）：{req.plan or '（未填）'}\n"
+        )
+        data = await _pg_claude_json(
+            "woop-coach", user_id, _WOOP_COACH_SYSTEM, content, max_tokens=768, model=_WOOP_COACH_MODEL,
+        )
+
+        valid_types = {"environment", "substitute", "reframe", "minimal", "help"}
+        plan_type = (data.get("plan_type") or "").strip().lower()
+        if plan_type not in valid_types:
+            plan_type = ""
+
+        alternatives = []
+        seen_types = set()
+        for alt in data.get("alternatives") or []:
+            if not isinstance(alt, dict):
+                continue
+            t = (alt.get("type") or "").strip().lower()
+            if t not in valid_types or t == plan_type or t in seen_types:
+                continue
+            suggestion = (alt.get("suggestion") or "").strip()
+            if not suggestion:
+                continue
+            seen_types.add(t)
+            alternatives.append({
+                "type": t,
+                "label": (alt.get("label") or "").strip() or t,
+                "suggestion": suggestion,
+            })
+
+        return {
+            "affirmation": data.get("affirmation", ""),
+            "plan_type": plan_type,
+            "alternatives": alternatives[:3],
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("woop_coach failed [%s]: %s", type(exc).__name__, exc)
         raise HTTPException(status_code=500, detail=f"{type(exc).__name__}: {exc}")
 
 

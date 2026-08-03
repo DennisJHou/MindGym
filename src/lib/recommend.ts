@@ -12,7 +12,7 @@
 // 這裡只是純函式，沒有副作用，方便單獨測試與之後擴充。
 // ─────────────────────────────────────────────────────────────────────────
 
-export type PracticeKey = 'gratitude' | 'three-good-things' | 'process-goal'
+export type PracticeKey = 'gratitude' | 'three-good-things' | 'process-goal' | 'woop'
 export type PermaLetter = 'P' | 'E' | 'R' | 'M' | 'A'
 
 export type PermaScoreRow = {
@@ -84,6 +84,13 @@ const PRACTICES: PracticeMeta[] = [
     targets: { P: 1, A: 1 },
     available: false, // 尚未實作，待 prompt 補上後改 true
   },
+  {
+    key: 'woop',
+    name: 'WOOP 目標實踐',
+    to: '/app/woop',
+    targets: { A: 1, E: 1, M: 1 },
+    available: true,
+  },
 ]
 
 const DIMS: PermaLetter[] = ['P', 'E', 'R', 'M', 'A']
@@ -108,10 +115,35 @@ function rotation(date: Date, idx: number, n: number): number {
  * @param scores 最新一筆 PERMA 分數（可為 null → 退回預設）
  * @param date   以哪一天計算（預設今天），用於輕量輪替
  */
+// WOOP 上架聚光燈：這幾天不管雷達圖分數，一律優先推薦 WOOP，讓推播帶進來的人
+// 首頁都能直接看到入口，不會被平常的輪替演算法蓋掉。窗口過後自動失效，
+// 屆時可以把這段連同下面的 if 一起刪掉，讓 WOOP 回到正常輪替。
+const WOOP_SPOTLIGHT_START = '2026-08-02'
+const WOOP_SPOTLIGHT_END = '2026-08-08' // 含當天
+
+function isoDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function recommendPractice(
   scores: PermaScoreRow | null,
   date: Date = new Date(),
 ): Recommendation {
+  const today = isoDate(date)
+  if (today >= WOOP_SPOTLIGHT_START && today <= WOOP_SPOTLIGHT_END) {
+    const woop = PRACTICES.find((p) => p.key === 'woop' && p.available)
+    if (woop) {
+      return {
+        key: woop.key,
+        name: woop.name,
+        to: woop.to,
+        search: woop.search,
+        reason: '新上架的 WOOP 目標實踐地圖，今天就來試試看吧',
+        permaTags: DIMS.filter((d) => woop.targets[d]).map((d) => `${d} ${DIM_LABEL[d]}`),
+      }
+    }
+  }
+
   const pool = PRACTICES.filter((p) => p.available)
   const n = pool.length
 

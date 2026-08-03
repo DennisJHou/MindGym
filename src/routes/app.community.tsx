@@ -11,6 +11,7 @@ import {
   type ReportTargetType,
 } from '../lib/communityModeration'
 import { usePullToRefresh, PULL_THRESHOLD } from '../lib/pullToRefresh'
+import { cancelWoopReminder } from '../lib/localNotifications'
 import { hardRefresh } from '../lib/refresh'
 import { useLanguage } from '../lib/i18n/context'
 import { translateTexts, type TranslateTargetLang } from '../lib/translate'
@@ -72,6 +73,12 @@ type PracticePayload = {
   outcome?: string
   obstacle?: string
   plan?: string
+  // 這次 WOOP 的目標日期（YYYY-MM-DD）；決定首頁 If-Then 卡片與推播何時出現
+  target_date?: string
+  // 使用者從 Bouba 的口袋方案裡「加入我的備案」的其他 then（可選，不覆蓋主計畫）
+  backup_plans?: string[]
+  // 是否已完成當天目標（首頁「今天做到了」寫入）
+  done?: boolean
   // 專業模組（v='pro_module'）：不標註是哪位專業夥伴（拍板決策）
   module_title?: string
   excerpt?: string
@@ -1494,7 +1501,8 @@ function practiceTag(practiceType: string | null): { label: string; tile: string
     case 'workshop_last_day':
       return { label: '生命最後一天', tile: 'bg-tile-peach' }
     case 'workshop_woop':
-      return { label: 'WOOP 目標實踐地圖', tile: 'bg-tile-lemon' }
+    case 'woop':
+      return { label: 'WOOP 目標實踐', tile: 'bg-tile-lemon' }
     case 'pro_module':
       return { label: '專業模組', tile: 'bg-tile-peach' }
     default:
@@ -1543,7 +1551,7 @@ function translatableFieldRefs(entry: GratitudeEntry): TranslatableFieldRef[] {
       { get: (e) => e.payload?.action, set: (e, v) => { if (e.payload) e.payload.action = v } },
     ]
   }
-  if (p === 'workshop_woop' && entry.payload) {
+  if ((p === 'workshop_woop' || p === 'woop') && entry.payload) {
     return [
       { get: (e) => e.payload?.wish, set: (e, v) => { if (e.payload) e.payload.wish = v } },
       { get: (e) => e.payload?.outcome, set: (e, v) => { if (e.payload) e.payload.outcome = v } },
@@ -1659,7 +1667,7 @@ function PracticeBodyContent({ entry }: { entry: GratitudeEntry }) {
   if (entry.practice_type === 'workshop_last_day' && entry.payload) {
     return <LastDayBody payload={entry.payload} />
   }
-  if (entry.practice_type === 'workshop_woop' && entry.payload) {
+  if ((entry.practice_type === 'workshop_woop' || entry.practice_type === 'woop') && entry.payload) {
     return <WoopBody payload={entry.payload} />
   }
   if (entry.practice_type === 'pro_module' && entry.payload) {
@@ -2266,6 +2274,10 @@ function EntryCard({
     if (error) {
       setDeleteErrored(true)
       return
+    }
+    // 貼文刪了，之前排的「早上 8 點提醒這句 If-Then」也該跟著取消，不然通知還是會跳。
+    if (entry.practice_type === 'woop' || entry.practice_type === 'workshop_woop') {
+      void cancelWoopReminder(entry.id)
     }
     setShowDeleteConfirm(false)
     onDelete?.(entry.id)

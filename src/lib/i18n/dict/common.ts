@@ -30,6 +30,11 @@ export const common: Record<string, Translation> = {
   '你的名字會顯示在打卡牆上': { 'zh-CN': '你的名字会显示在打卡墙上', en: 'Your name will show on the community wall' },
   '以「能量代號」匿名出現在打卡牆': { 'zh-CN': '以「能量代号」匿名出现在打卡墙', en: 'Appears anonymously on the wall under an energy codename' },
   '只有你看得到，不會出現在打卡牆': { 'zh-CN': '只有你看得到，不会出现在打卡墙', en: 'Only visible to you — won’t appear on the wall' },
+  // 練習進入頁的重點條列（自我慈悲／WOOP 共用）
+  '可以選擇要不要分享，也能選擇匿名或僅自己看得到': {
+    'zh-CN': '可以选择要不要分享，也能选择匿名或仅自己看得到',
+    en: 'Choose whether to share — anonymously, or keep it just for yourself',
+  },
 
   // 檢舉原因（lib/communityModeration.ts REPORT_REASONS）
   '騷擾或霸凌': { 'zh-CN': '骚扰或霸凌', en: 'Harassment or bullying' },

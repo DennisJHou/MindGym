@@ -14,6 +14,8 @@ export interface PermaGrowthItem {
  * 而不是各自複製一份 markup——之後新增模組只要接上 items 就好。
  */
 export function PermaGrowthCard({ title, items }: { title: string; items: readonly PermaGrowthItem[] }) {
+  // 以這組加分裡的最大值當滿格，各模組的加分級距不同也不會全部撐滿看不出差異。
+  const maxDelta = Math.max(1, ...items.map((i) => i.delta))
   return (
     <div className="mb-6 w-full rounded-3xl bg-card p-6 shadow-soft">
       <p className="mb-4 text-[10px] font-extrabold uppercase tracking-[0.25em] text-muted-foreground">
@@ -34,7 +36,7 @@ export function PermaGrowthCard({ title, items }: { title: string; items: readon
               <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
                 <div
                   className={`h-full rounded-full ${bar} celebrate-bar`}
-                  style={{ width: `${(delta / 3) * 100}%`, animationDelay: `${0.25 + i * 0.18}s` }}
+                  style={{ width: `${(delta / maxDelta) * 100}%`, animationDelay: `${0.25 + i * 0.18}s` }}
                 />
               </div>
               <span className="w-10 shrink-0 text-right text-sm font-extrabold text-primary">

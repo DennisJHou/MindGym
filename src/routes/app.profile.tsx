@@ -81,6 +81,32 @@ const PG_KIND_META: Record<PgItem['kind'], { label: string }> = {
   morning: { label: '早晨啟動' },
 }
 
+// WOOP 目標實踐的每日紀錄，用於「我的健心日記」日曆。
+type WoopCalendarItem = {
+  entry_date: string
+  wish: string
+  outcome: string
+  obstacle: string
+  plan: string
+}
+
+// gratitude_entries（practice_type='woop'）的 row 轉成日曆用的 WoopCalendarItem——
+// 內容存在 payload jsonb，loader 與日曆元件自己的月份切換都要用同一份轉換邏輯。
+function woopRowsToCalendarItems(
+  rows: { entry_date: string; payload: Record<string, unknown> | null }[],
+): WoopCalendarItem[] {
+  return rows.map((r) => {
+    const p = (r.payload ?? {}) as Record<string, string>
+    return {
+      entry_date: String(r.entry_date).slice(0, 10),
+      wish: p.wish ?? '',
+      outcome: p.outcome ?? '',
+      obstacle: p.obstacle ?? '',
+      plan: p.plan ?? '',
+    }
+  })
+}
+
 function EditPencilIcon({ className = 'h-3.5 w-3.5' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -120,7 +146,7 @@ export const Route = createFileRoute('/app/profile')({
   loader: async () => {
     const { data: { session } } = await supabase.auth.getSession()
     const userId = session?.user.id
-    if (!userId) return { name: null, avatar: null, scores: null, experience: null, harvestedFlowers: 0, userId: null, initialEntries: [], streak: 0, monthlyCount: 0, totalCount: 0, hasPracticedToday: false }
+    if (!userId) return { name: null, avatar: null, scores: null, experience: null, harvestedFlowers: 0, userId: null, initialEntries: [], initialWoopEntries: [], streak: 0, monthlyCount: 0, totalCount: 0, hasPracticedToday: false }
 
     const fallbackName =
       (session?.user.user_metadata?.full_name as string | undefined) ??
@@ -135,7 +161,7 @@ export const Route = createFileRoute('/app/profile')({
     const lastDay = new Date(y, m, 0).getDate()
     const endOfMonth = `${y}-${String(m).padStart(2, '0')}-${lastDay}`
 
-    const [profileRes, permaRes, entriesRes, allDatesRes, focusAllRes, morningAllRes, focusMonthRes, morningMonthRes] = await Promise.all([
+    const [profileRes, permaRes, entriesRes, allDatesRes, focusAllRes, morningAllRes, focusMonthRes, morningMonthRes, woopMonthRes, woopAllDatesRes] = await Promise.all([
       supabase.from('profiles').select('name, avatar').eq('id', userId).maybeSingle(),
       supabase
         .from('perma_scores')
@@ -162,19 +188,35 @@ export const Route = createFileRoute('/app/profile')({
       supabase.from('morning_logs').select('log_date').eq('user_id', userId),
       supabase.from('focus_logs').select('log_date').eq('user_id', userId).gte('log_date', startOfMonth).lte('log_date', endOfMonth),
       supabase.from('morning_logs').select('log_date').eq('user_id', userId).gte('log_date', startOfMonth).lte('log_date', endOfMonth),
+      // WOOP 目標實踐（practice_type='woop'）也算「健心」，併入日曆／連續／統計
+      supabase
+        .from('gratitude_entries')
+        .select('id, entry_date, payload')
+        .eq('user_id', userId)
+        .eq('practice_type', 'woop')
+        .gte('entry_date', startOfMonth)
+        .lte('entry_date', endOfMonth),
+      supabase
+        .from('gratitude_entries')
+        .select('entry_date')
+        .eq('user_id', userId)
+        .eq('practice_type', 'woop')
+        .order('entry_date', { ascending: false }),
     ])
 
-    // 連續打卡與統計跨練習計算（感恩日記 + 過程目標覺察）
+    // 連續打卡與統計跨練習計算（感恩日記 + 過程目標覺察 + WOOP）
     const unifiedDates = [
       ...(allDatesRes.data ?? []).map((e) => String(e.entry_date)),
       ...(focusAllRes.data ?? []).map((r) => String(r.log_date)),
       ...(morningAllRes.data ?? []).map((r) => String(r.log_date)),
+      ...(woopAllDatesRes.data ?? []).map((e) => String(e.entry_date)),
     ]
     const streak = streakFromDates(unifiedDates)
     const hasPracticedToday = unifiedDates.some((d) => d.slice(0, 10) === isoLocalDate(today))
 
     const monthlyCount =
-      (entriesRes.data?.length ?? 0) + (focusMonthRes.data?.length ?? 0) + (morningMonthRes.data?.length ?? 0)
+      (entriesRes.data?.length ?? 0) + (focusMonthRes.data?.length ?? 0) + (morningMonthRes.data?.length ?? 0) +
+      (woopMonthRes.data?.length ?? 0)
     const totalCount = new Set(unifiedDates.map((d) => d.slice(0, 10))).size
 
     const dbName = (profileRes.data?.name ?? null) as string | null
@@ -229,6 +271,7 @@ export const Route = createFileRoute('/app/profile')({
       harvestedFlowers,
       userId,
       initialEntries: (entriesRes.data ?? []) as GratitudeEntry[],
+      initialWoopEntries: woopRowsToCalendarItems(woopMonthRes.data ?? []),
       streak,
       monthlyCount,
       totalCount,
@@ -694,9 +737,11 @@ function GratitudeTargetMap({ userId }: { userId: string | null }) {
 
 function GratitudeCalendar({
   initialEntries,
+  initialWoopEntries,
   userId,
 }: {
   initialEntries: GratitudeEntry[]
+  initialWoopEntries: WoopCalendarItem[]
   userId: string | null
 }) {
   const { t } = useLanguage()
@@ -707,10 +752,12 @@ function GratitudeCalendar({
   const [month, setMonth] = useState(todayDate.getMonth()) // 0-indexed
   const [entries, setEntries] = useState<GratitudeEntry[]>(initialEntries)
   const [pgItems, setPgItems] = useState<PgItem[]>([])
+  const [woopItems, setWoopItems] = useState<WoopCalendarItem[]>(initialWoopEntries)
   const [loading, setLoading] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [modalEntry, setModalEntry] = useState<GratitudeEntry | null>(null)
   const [pgModal, setPgModal] = useState<PgItem | null>(null)
+  const [woopModal, setWoopModal] = useState<WoopCalendarItem | null>(null)
 
   // 永遠用最新的 DB 資料覆蓋（避免 useState 鎖在第一次的 initialEntries）
   useEffect(() => {
@@ -783,10 +830,40 @@ function GratitudeCalendar({
     return () => { cancelled = true }
   }, [year, month, userId])
 
+  // WOOP 目標實踐：抓本月發佈的 WOOP，併入健心日記（跟感恩日記／過程目標覺察同等地位）
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+
+    const m = month + 1
+    const startDate = `${year}-${String(m).padStart(2, '0')}-01`
+    const lastDay = new Date(year, month + 1, 0).getDate()
+    const endDate = `${year}-${String(m).padStart(2, '0')}-${lastDay}`
+
+    supabase
+      .from('gratitude_entries')
+      .select('entry_date, payload')
+      .eq('user_id', userId)
+      .eq('practice_type', 'woop')
+      .gte('entry_date', startDate)
+      .lte('entry_date', endDate)
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) console.error('[calendar woop fetch]', error)
+        setWoopItems(woopRowsToCalendarItems(data ?? []))
+      })
+
+    return () => { cancelled = true }
+  }, [year, month, userId])
+
   // 當父層因 router.invalidate() 回傳新的 initialEntries 時，立即同步
   useEffect(() => {
     setEntries(initialEntries)
   }, [initialEntries])
+
+  useEffect(() => {
+    setWoopItems(initialWoopEntries)
+  }, [initialWoopEntries])
 
   const firstWeekday = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
@@ -799,7 +876,14 @@ function GratitudeCalendar({
     list.push(it)
     pgMap.set(it.log_date, list)
   }
-  const hasAnyEntry = (ds: string) => entryMap.has(ds) || pgMap.has(ds)
+  // 跟過程目標覺察一樣用陣列——WOOP 沒有「一天只能一則」的限制，同一天多則都要顯示。
+  const woopMap = new Map<string, WoopCalendarItem[]>()
+  for (const it of woopItems) {
+    const list = woopMap.get(it.entry_date) ?? []
+    list.push(it)
+    woopMap.set(it.entry_date, list)
+  }
+  const hasAnyEntry = (ds: string) => entryMap.has(ds) || pgMap.has(ds) || woopMap.has(ds)
 
   const cells: (number | null)[] = [
     ...Array(firstWeekday).fill(null),
@@ -821,6 +905,7 @@ function GratitudeCalendar({
 
   const selectedEntry = selectedDate ? (entryMap.get(selectedDate) ?? null) : null
   const selectedPg = selectedDate ? (pgMap.get(selectedDate) ?? []) : []
+  const selectedWoop = selectedDate ? (woopMap.get(selectedDate) ?? []) : []
 
   return (
     <>
@@ -891,7 +976,7 @@ function GratitudeCalendar({
         {/* 選取日期詳情 */}
         {selectedDate && (
           <div className="mt-4 rounded-2xl bg-muted p-4">
-            {selectedEntry || selectedPg.length > 0 ? (
+            {selectedEntry || selectedPg.length > 0 || selectedWoop.length > 0 ? (
               <div className="flex flex-col gap-2">
                 <p className="mb-1 text-xs font-bold text-muted-foreground">
                   {t('{date} 的練習紀錄', { date: selectedDate })}
@@ -919,6 +1004,21 @@ function GratitudeCalendar({
                     </span>
                     <span className="flex-1 text-sm font-bold text-foreground">
                       {t('過程目標覺察')} · {t(PG_KIND_META[it.kind].label)}
+                    </span>
+                    <span className="text-xs font-extrabold text-primary">✓ {t('已完成')}</span>
+                  </button>
+                ))}
+                {selectedWoop.map((it, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setWoopModal(it)}
+                    className="flex w-full items-center gap-3 rounded-xl bg-card p-3 text-left shadow-soft transition active:scale-[0.98]"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-tile-lemon">
+                      <span className="h-2.5 w-2.5 rounded-full bg-[#8a7a3f]" />
+                    </span>
+                    <span className="flex-1 text-sm font-bold text-foreground">
+                      {t('WOOP 目標實踐')}{selectedWoop.length > 1 ? ` #${i + 1}` : ''}
                     </span>
                     <span className="text-xs font-extrabold text-primary">✓ {t('已完成')}</span>
                   </button>
@@ -1063,6 +1163,57 @@ function GratitudeCalendar({
           </div>
         </div>
       )}
+
+      {/* WOOP 目標實踐 Modal */}
+      {woopModal && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-foreground/30 px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] backdrop-blur-sm"
+          onClick={() => setWoopModal(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl bg-card p-6 shadow-soft"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-start justify-between">
+              <div>
+                <p className="text-[10px] font-extrabold uppercase tracking-[0.25em] text-muted-foreground">
+                  WOOP
+                </p>
+                <h3 className="text-lg font-extrabold text-foreground">{t('WOOP 目標實踐')}</h3>
+                <p className="text-xs text-muted-foreground">{woopModal.entry_date}</p>
+              </div>
+              <button
+                onClick={() => setWoopModal(null)}
+                className="ml-4 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition active:scale-95"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex flex-col gap-3">
+              {[
+                { label: t('設定目標'), value: woopModal.wish },
+                { label: t('看見結果'), value: woopModal.outcome },
+                { label: t('覺察阻礙'), value: woopModal.obstacle },
+              ].map(({ label, value }) =>
+                value ? (
+                  <div key={label} className="rounded-2xl bg-tile-lemon p-4">
+                    <p className="mb-1 text-[10px] font-extrabold uppercase tracking-[0.2em] text-foreground/60">{label}</p>
+                    <p className="text-sm leading-relaxed text-foreground">{value}</p>
+                  </div>
+                ) : null,
+              )}
+              {woopModal.plan && (
+                <div className="rounded-2xl p-4" style={{ backgroundColor: '#EEEDFE', color: '#26215C' }}>
+                  <p className="mb-1.5 text-[10px] font-extrabold uppercase tracking-[0.2em]">{t('你的 If-Then 計畫')}</p>
+                  <p className="text-sm leading-relaxed">
+                    {t('如果{o}，那麼我就{p}。', { o: woopModal.obstacle, p: woopModal.plan })}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
@@ -1081,7 +1232,7 @@ function WeeklyReviewEntry({ userId }: { userId: string }) {
     return () => { cancelled = true }
   }, [userId])
 
-  const total = (counts?.gratitudeCount ?? 0) + (counts?.processCount ?? 0) + (counts?.selfCompassionCount ?? 0)
+  const total = (counts?.gratitudeCount ?? 0) + (counts?.processCount ?? 0) + (counts?.selfCompassionCount ?? 0) + (counts?.woopCount ?? 0)
 
   return (
     <Link
@@ -1095,7 +1246,7 @@ function WeeklyReviewEntry({ userId }: { userId: string }) {
         <span className="block text-sm font-extrabold text-foreground">{t('本週回顧')}</span>
         {counts && total > 0 ? (
           <span className="block text-xs font-bold text-muted-foreground">
-            {t('感恩 {n1} 次 · 過程 {n2} 次 · 慈悲 {n3} 次', { n1: counts.gratitudeCount, n2: counts.processCount, n3: counts.selfCompassionCount })}
+            {t('感恩 {n1} 次 · 過程 {n2} 次 · 慈悲 {n3} 次 · WOOP {n4} 次', { n1: counts.gratitudeCount, n2: counts.processCount, n3: counts.selfCompassionCount, n4: counts.woopCount })}
           </span>
         ) : (
           <span className="block text-xs font-bold text-muted-foreground">{t('看看這週的健心狀況')}</span>
@@ -1352,7 +1503,7 @@ function PartnerPlanter({ experience }: { experience: PermaScores | null }) {
 }
 
 function ProfilePage() {
-  const { name, avatar: initialAvatar, scores, experience, harvestedFlowers, userId, initialEntries, streak, monthlyCount, totalCount, hasPracticedToday } = Route.useLoaderData()
+  const { name, avatar: initialAvatar, scores, experience, harvestedFlowers, userId, initialEntries, initialWoopEntries, streak, monthlyCount, totalCount, hasPracticedToday } = Route.useLoaderData()
   const router = useRouter()
   const { t } = useLanguage()
   const [avatar, setAvatar] = useState<string | null>(initialAvatar ?? null)
@@ -1508,7 +1659,7 @@ function ProfilePage() {
         </div>
 
         {/* 健心紀錄日曆 */}
-        <GratitudeCalendar initialEntries={initialEntries} userId={userId} />
+        <GratitudeCalendar initialEntries={initialEntries} initialWoopEntries={initialWoopEntries} userId={userId} />
 
         {/* PERMA 雷達圖 + 分數 */}
         {scores ? (
