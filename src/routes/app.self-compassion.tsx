@@ -413,12 +413,12 @@ function IntroStage({ onGoBack, onStart }: { onGoBack: () => void; onStart: () =
   const permaBoosts = getPermaBoosts(t)
 
   return (
-    <div className="animate-fade-up mx-auto max-w-md px-5 pt-4 pb-8">
-      <div className="relative left-1/2 right-1/2 -mx-[50vw] h-[170px] w-screen overflow-hidden">
+    <div className="animate-fade-up mx-auto max-w-3xl px-5 pt-4 pb-8">
+      <div className="relative left-1/2 right-1/2 -mx-[50vw] -mt-4 w-screen overflow-hidden">
         <img
           src={heartsBanner}
           alt=""
-          className="pointer-events-none absolute inset-0 w-full h-full object-cover"
+          className="pointer-events-none block h-auto w-full"
         />
         <button
           onClick={onGoBack}
@@ -564,7 +564,7 @@ function CalmStage({ onBack, onNext }: { onBack: () => void; onNext: () => void 
   const { t } = useLanguage()
 
   return (
-    <div className="animate-fade-up mx-auto max-w-md px-5 pt-4 pb-8">
+    <div className="animate-fade-up mx-auto max-w-3xl px-5 pt-4 pb-8">
       <button
         onClick={onBack}
         className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#542916] bg-[#FEFAF0] text-[#542916] shadow-soft transition active:scale-90"
@@ -661,7 +661,7 @@ function WritingStage({
   const { t } = useLanguage()
 
   return (
-    <div className="animate-fade-up mx-auto max-w-md px-5 pt-4 pb-8">
+    <div className="animate-fade-up mx-auto max-w-3xl px-5 pt-4 pb-8">
       <button
         onClick={onBack}
         className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#542916] bg-[#FEFAF0] text-[#542916] shadow-soft transition active:scale-90"
@@ -790,7 +790,7 @@ function ShareStage({
   }
 
   return (
-    <div className="animate-fade-up mx-auto max-w-md px-5 pt-4 pb-8">
+    <div className="animate-fade-up mx-auto max-w-3xl px-5 pt-4 pb-8">
       <button
         onClick={onBack}
         className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#542916] bg-[#FEFAF0] text-[#542916] shadow-soft transition active:scale-90"
@@ -1049,7 +1049,7 @@ function CelebrateStage({
   const { t } = useLanguage()
 
   return (
-    <div className="animate-fade-up mx-auto flex max-w-md flex-col items-center px-5 pt-4 pb-8 text-center">
+    <div className="animate-fade-up mx-auto flex max-w-3xl flex-col items-center px-5 pt-4 pb-8 text-center">
       <button
         onClick={onBack}
         className="mb-3 flex h-8 w-8 items-center justify-center self-start rounded-full border-2 border-[#542916] bg-[#FEFAF0] text-[#542916] shadow-soft transition active:scale-90"

@@ -175,13 +175,13 @@ function HomePage() {
   }, [])
 
   return (
-    <div className="mx-auto max-w-md animate-fade-up px-5 pt-3 pb-28">
+    <div className="mx-auto max-w-3xl animate-fade-up px-5 pt-3 pb-28">
       {/* 標題 + 吉祥物 */}
       <div className="relative min-h-[118px]">
         <img
           src={homeMascot}
           alt=""
-          className="pointer-events-none absolute -right-2 -top-4 w-[140px] opacity-95"
+          className="pointer-events-none absolute -right-5 -top-3 w-[140px] opacity-95"
         />
         <p className="pt-1.5 text-base font-light tracking-[0.05em] text-foreground">{t('嗨，歡迎回來')}</p>
         <h1 className="mt-3 max-w-[64%] text-[25px] font-black leading-[1.32] tracking-[0.03em] text-muted-foreground">
@@ -411,10 +411,10 @@ function TodayPracticeBadge({ recommendation }: { recommendation: Recommendation
   if (dismissed) return null
 
   return (
-    // 外層貼齊視窗兩側、內層 mx-auto max-w-md 與其餘頁面內容同一欄位對齊（比照 BottomNav 的做法），
+    // 外層貼齊視窗兩側、內層 mx-auto max-w-3xl 與其餘頁面內容同一欄位對齊（比照 BottomNav 的做法），
     // 避免畫面比手機版面寬時，浮標貼著瀏覽器邊緣、跟置中的內容欄位對不齊。
     <div className="pointer-events-none fixed inset-x-0 bottom-[calc(7rem+env(safe-area-inset-bottom))] z-40">
-      <div className="pointer-events-none relative mx-auto max-w-md">
+      <div className="pointer-events-none relative mx-auto max-w-3xl">
         <div className="pointer-events-auto absolute right-4 bottom-0">
           <Link
             {...(linkProps as Parameters<typeof Link>[0])}
@@ -774,6 +774,15 @@ type ExerciseCardProps = {
   locked?: boolean
   rotateImage?: boolean
   completed?: boolean
+  onAdd?: () => void
+}
+
+function PlusIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  )
 }
 
 function LockIcon({ className = 'h-7 w-7' }: { className?: string }) {
@@ -793,7 +802,7 @@ function CheckIcon({ className = 'h-4 w-4' }: { className?: string }) {
   )
 }
 
-function ExerciseCard({ to, search, img, name, meta, badge, tone = 'cream', locked, rotateImage, completed }: ExerciseCardProps) {
+function ExerciseCard({ to, search, img, name, meta, badge, tone = 'cream', locked, rotateImage, completed, onAdd }: ExerciseCardProps) {
   const { t } = useLanguage()
   const isGold = tone === 'gold'
   const style = isGold ? { backgroundColor: '#FEFAF0' } : undefined
@@ -833,10 +842,24 @@ function ExerciseCard({ to, search, img, name, meta, badge, tone = 'cream', lock
           {t(badge)}
         </span>
       )}
+      {onAdd && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onAdd()
+          }}
+          aria-label={t('加入今日行程')}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-[1.5px] border-foreground text-foreground transition active:scale-90"
+        >
+          <PlusIcon />
+        </button>
+      )}
     </>
   )
 
-  if (locked || !to) {
+  if (locked || !to || onAdd) {
     return (
       <div
         className="relative flex items-center gap-3.5 overflow-hidden rounded-2xl px-4 py-3.5 opacity-60"
@@ -882,7 +905,7 @@ const PRACTICE_CATALOG: PracticeDef[] = [
   { key: 'woop', name: 'WOOP 目標實踐地圖', meta: '成就力 · 投入力', to: '/app/woop', img: woopIcon, locked: false },
 ]
 
-const PRACTICE_MAP = new Map(PRACTICE_CATALOG.map((p) => [p.key, p]))
+const LAUNCHED_PRACTICES = PRACTICE_CATALOG.filter((p) => !p.locked)
 
 async function fetchSchedule(userId: string, dateStr: string): Promise<SchedulePracticeKey[]> {
   const { data, error } = await supabase
@@ -933,94 +956,6 @@ async function fetchCompletedKeys(
   return completed
 }
 
-function PlusIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 5v14M5 12h14" />
-    </svg>
-  )
-}
-
-function AddPracticeModal({
-  initialSelected,
-  onClose,
-  onConfirm,
-}: {
-  initialSelected: SchedulePracticeKey[]
-  onClose: () => void
-  onConfirm: (keys: SchedulePracticeKey[]) => void
-}) {
-  const { t } = useLanguage()
-  const [selected, setSelected] = useState<Set<SchedulePracticeKey>>(new Set(initialSelected))
-
-  const toggle = (p: PracticeDef) => {
-    if (p.locked) return
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (next.has(p.key)) next.delete(p.key)
-      else next.add(p.key)
-      return next
-    })
-  }
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#1c1714]/40 px-4 pb-6 pt-10 sm:items-center">
-      <div className="flex max-h-[88vh] w-full max-w-md animate-slide-up flex-col overflow-hidden rounded-[26px] bg-background shadow-soft">
-        <div className="overflow-y-auto px-6 pt-6">
-          <h2 className="text-xl font-black leading-snug tracking-[0.02em] text-foreground">{t('安排今天的練習')}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{t('勾選你今天想做的練習')}</p>
-          <div className="mt-4 flex flex-col gap-2.5 pb-2">
-            {PRACTICE_CATALOG.map((p) => {
-              const isChecked = selected.has(p.key)
-              return (
-                <button
-                  key={p.key}
-                  type="button"
-                  disabled={p.locked}
-                  onClick={() => toggle(p)}
-                  className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
-                    p.locked
-                      ? 'cursor-not-allowed border-[#e3dccd] bg-cream/60 opacity-50'
-                      : 'border-[#e3dccd] bg-cream active:scale-[0.98]'
-                  }`}
-                >
-                  <span
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-[1.5px] ${
-                      isChecked && !p.locked ? 'border-foreground bg-foreground text-cream' : 'border-[#6f5547] text-transparent'
-                    }`}
-                  >
-                    {p.locked ? <LockIcon className="h-3.5 w-3.5 text-muted-foreground" /> : <CheckIcon className="h-3.5 w-3.5" />}
-                  </span>
-                  <span className="flex-1">
-                    <b className="block text-[15px] font-black text-foreground">{t(p.name)}</b>
-                    <span className="block text-xs text-muted-foreground">{p.locked ? t('敬請期待') : t(p.meta)}</span>
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-        <div className="flex gap-3 border-t border-[#e3dccd] px-6 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 rounded-full border border-foreground py-3 text-sm font-bold text-foreground"
-          >
-            {t('取消')}
-          </button>
-          <button
-            type="button"
-            onClick={() => onConfirm(Array.from(selected))}
-            className="flex-1 rounded-full bg-foreground py-3 text-sm font-bold text-cream"
-          >
-            {t('確定')}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function DailySchedule({
   userId,
   recommendation,
@@ -1043,7 +978,6 @@ function DailySchedule({
   const [scheduled, setScheduled] = useState<SchedulePracticeKey[]>([])
   const [completed, setCompleted] = useState<Set<SchedulePracticeKey>>(new Set())
   const [loading, setLoading] = useState(true)
-  const [modalOpen, setModalOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -1062,11 +996,11 @@ function DailySchedule({
     }
   }, [userId, dateStr])
 
-  const handleConfirm = async (keys: SchedulePracticeKey[]) => {
-    setModalOpen(false)
-    setScheduled(keys)
-    await saveSchedule(userId, dateStr, keys)
-    const done = await fetchCompletedKeys(userId, dateStr, keys)
+  const handleAddSingle = async (key: SchedulePracticeKey) => {
+    const next = [...scheduled, key]
+    setScheduled(next)
+    await saveSchedule(userId, dateStr, next)
+    const done = await fetchCompletedKeys(userId, dateStr, next)
     setCompleted(done)
   }
 
@@ -1086,60 +1020,35 @@ function DailySchedule({
         <p className="text-sm font-bold text-muted-foreground">
           {allDone ? t('哇！你都做完了~~Bouba覺得你好強！！！') : t('你想為自己安排哪些練習？')}
         </p>
-        <button
-          type="button"
-          onClick={() => setModalOpen(true)}
-          aria-label={t('安排練習')}
-          className="flex h-8 w-8 items-center justify-center rounded-full border-[1.5px] border-foreground text-foreground transition active:scale-90"
-        >
-          <PlusIcon />
-        </button>
       </div>
 
-      {!loading && scheduled.length === 0 && (
-        <p className="rounded-2xl bg-cream px-4 py-6 text-center text-sm text-muted-foreground">
-          {t('這天還沒安排練習，點右上角的 + 開始吧')}
-        </p>
-      )}
-
       <div className="flex flex-col gap-3">
-        {scheduled.map((key) => {
-          const def = PRACTICE_MAP.get(key)
-          if (!def) return null
+        {LAUNCHED_PRACTICES.map((p) => {
+          const isScheduled = scheduled.includes(p.key)
           return (
             <ExerciseCard
-              key={key}
-              to={def.to}
-              img={def.img}
-              name={def.name}
-              meta={def.meta}
-              tone={def.key === 'gratitude' ? 'gold' : 'cream'}
-              badge={recommendation.key === def.key ? '今日推薦' : undefined}
-              completed={completed.has(key)}
-              locked={def.locked}
+              key={p.key}
+              to={p.to}
+              img={p.img}
+              name={p.name}
+              meta={p.meta}
+              tone={p.key === 'gratitude' ? 'gold' : 'cream'}
+              badge={isScheduled && recommendation.key === p.key ? '今日推薦' : undefined}
+              completed={isScheduled && completed.has(p.key)}
+              onAdd={isScheduled ? undefined : () => handleAddSingle(p.key)}
             />
           )
         })}
       </div>
-
-      {modalOpen && (
-        <AddPracticeModal
-          initialSelected={scheduled}
-          onClose={() => setModalOpen(false)}
-          onConfirm={handleConfirm}
-        />
-      )}
     </div>
   )
 }
 
-type TrainingTab = 'schedule' | 'perma' | 'new' | 'hot'
+type TrainingTab = 'schedule' | 'perma'
 
 const TABS: { key: TrainingTab; label: string }[] = [
   { key: 'schedule', label: '我的日程' },
   { key: 'perma', label: 'PERMA' },
-  { key: 'new', label: '最新上架' },
-  { key: 'hot', label: '最熱門' },
 ]
 
 function TrainingCenter({ recommendation, userId }: { recommendation: Recommendation; userId: string }) {
@@ -1165,7 +1074,7 @@ function TrainingCenter({ recommendation, userId }: { recommendation: Recommenda
     <section className="pb-4">
       <SectionTitle zh={t('健心訓練中心')} />
 
-      <div className="scroll -mx-5 mb-3.5 flex gap-3.5 overflow-x-auto px-5 pb-1 no-scrollbar">
+      <div className="scroll -mx-5 mb-3.5 flex justify-center gap-3.5 overflow-x-auto px-5 pb-1 no-scrollbar">
         {TABS.map((tab) => (
           <button
             key={tab.key}
@@ -1199,57 +1108,6 @@ function TrainingCenter({ recommendation, userId }: { recommendation: Recommenda
           </p>
           <PermaCards />
         </>
-      )}
-
-      {activeTab === 'new' && (
-        <div className="flex flex-col gap-3">
-          <ExerciseCard
-            to="/app/woop"
-            img={woopIcon}
-            name="WOOP 目標實踐地圖"
-            meta="新上架 · 成就力 · 投入力"
-            badge="NEW"
-          />
-          <ExerciseCard
-            to="/app/process-goal"
-            img={processGoalIcon}
-            name="過程目標覺察"
-            meta="新上架 · 找回你的專注狀態"
-            badge="NEW"
-          />
-          <ExerciseCard
-            img={threeGoodThingsIcon}
-            name="三件好事"
-            meta="即將上架 · 情緒力 · 成就力"
-            locked
-          />
-          <ExerciseCard
-            to="/app/self-compassion"
-            img={selfCompassionIcon}
-            name="自我慈悲"
-            meta="新上架 · 連結力 · 意義力"
-            badge="NEW"
-          />
-          <ExerciseCard
-            img={mindfulnessIcon}
-            name="正念冥想"
-            meta="即將上架 · 情緒力 · 投入力"
-            locked
-          />
-        </div>
-      )}
-
-      {activeTab === 'hot' && (
-        <div className="flex flex-col gap-3">
-          <ExerciseCard
-            to="/app/gratitude"
-            img={exerciseGratitude}
-            name="感恩日記"
-            meta="P 情緒力 · R 連結力 · M 意義力"
-            tone="gold"
-            badge="熱門"
-          />
-        </div>
       )}
     </section>
   )

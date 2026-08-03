@@ -59,6 +59,9 @@ type PracticeMeta = {
   targets: Partial<Record<PermaLetter, number>>
   /** 目前是否已實作可用；未上架者不會被選為「今日練習」 */
   available: boolean
+  /** 上架日期（YYYY-MM-DD）。有填的話，上架後 NEW_SPOTLIGHT_WINDOW_DAYS 天內
+   *  會優先聚光燈推薦，讓推播帶進來的人首頁都能直接看到入口。 */
+  launchedAt?: string
 }
 
 const PRACTICES: PracticeMeta[] = [
@@ -90,10 +93,14 @@ const PRACTICES: PracticeMeta[] = [
     to: '/app/woop',
     targets: { A: 1, E: 1, M: 1 },
     available: true,
+    launchedAt: '2026-08-02',
   },
 ]
 
 const DIMS: PermaLetter[] = ['P', 'E', 'R', 'M', 'A']
+
+/** 新模組上架聚光燈維持的天數（含上架當天）。 */
+const NEW_SPOTLIGHT_WINDOW_DAYS = 7
 
 /** 缺乏程度：分數越低越缺乏（5 分制 → 5-score）。無分數時視為中性 2.5。 */
 function weakness(scores: PermaScoreRow | null, dim: PermaLetter): number {
@@ -102,12 +109,23 @@ function weakness(scores: PermaScoreRow | null, dim: PermaLetter): number {
   return 5 - s
 }
 
-/** 一個 0~1 之間、隨「天」變動的小輪替值，用來在分數接近時讓推薦有變化。 */
-function rotation(date: Date, idx: number, n: number): number {
-  const dayOfYear = Math.floor(
+function dayOfYear(date: Date): number {
+  return Math.floor(
     (date.getTime() - new Date(date.getFullYear(), 0, 0).getTime()) / 86400000,
   )
-  return ((dayOfYear + idx) % Math.max(1, n)) / (n * 100) // 很小，只當 tiebreak
+}
+
+/** 一個 0~1 之間、隨「天」變動的小輪替值，用來在分數接近時讓推薦有變化。 */
+function rotation(date: Date, idx: number, n: number): number {
+  return ((dayOfYear(date) + idx) % Math.max(1, n)) / (n * 100) // 很小，只當 tiebreak
+}
+
+/** 距離上架日期過了幾天（含當天為 0）；用本地日期比較，避免時區誤差。 */
+function daysSinceLaunch(launchedAt: string, date: Date): number {
+  const [y, m, d] = launchedAt.split('-').map(Number)
+  const launch = new Date(y, m - 1, d)
+  const today = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  return Math.round((today.getTime() - launch.getTime()) / 86400000)
 }
 
 /**
@@ -115,32 +133,26 @@ function rotation(date: Date, idx: number, n: number): number {
  * @param scores 最新一筆 PERMA 分數（可為 null → 退回預設）
  * @param date   以哪一天計算（預設今天），用於輕量輪替
  */
-// WOOP 上架聚光燈：這幾天不管雷達圖分數，一律優先推薦 WOOP，讓推播帶進來的人
-// 首頁都能直接看到入口，不會被平常的輪替演算法蓋掉。窗口過後自動失效，
-// 屆時可以把這段連同下面的 if 一起刪掉，讓 WOOP 回到正常輪替。
-const WOOP_SPOTLIGHT_START = '2026-08-02'
-const WOOP_SPOTLIGHT_END = '2026-08-08' // 含當天
-
-function isoDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 export function recommendPractice(
   scores: PermaScoreRow | null,
   date: Date = new Date(),
 ): Recommendation {
-  const today = isoDate(date)
-  if (today >= WOOP_SPOTLIGHT_START && today <= WOOP_SPOTLIGHT_END) {
-    const woop = PRACTICES.find((p) => p.key === 'woop' && p.available)
-    if (woop) {
-      return {
-        key: woop.key,
-        name: woop.name,
-        to: woop.to,
-        search: woop.search,
-        reason: '新上架的 WOOP 目標實踐地圖，今天就來試試看吧',
-        permaTags: DIMS.filter((d) => woop.targets[d]).map((d) => `${d} ${DIM_LABEL[d]}`),
-      }
+  // 新上架聚光燈：只要有練習還在上架後的聚光燈窗口內，一律優先推薦，
+  // 不被平常的雷達圖輪替演算法蓋掉。窗口過後自動失效，退回正常輪替。
+  const spotlightPool = PRACTICES.filter((p) => {
+    if (!p.available || !p.launchedAt) return false
+    const days = daysSinceLaunch(p.launchedAt, date)
+    return days >= 0 && days < NEW_SPOTLIGHT_WINDOW_DAYS
+  })
+  if (spotlightPool.length > 0) {
+    const chosen = spotlightPool[dayOfYear(date) % spotlightPool.length]
+    return {
+      key: chosen.key,
+      name: chosen.name,
+      to: chosen.to,
+      search: chosen.search,
+      reason: `新上架的「${chosen.name}」，今天就來試試看吧`,
+      permaTags: DIMS.filter((d) => chosen.targets[d]).map((d) => `${d} ${DIM_LABEL[d]}`),
     }
   }
 

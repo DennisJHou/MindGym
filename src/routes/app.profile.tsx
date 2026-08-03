@@ -546,13 +546,40 @@ function BoabaCard({ name, hasPracticedToday }: { name: string | null; hasPracti
   )
 }
 
-function SectionLabel({ zh }: { zh: string }) {
+function SectionLabel({ zh, onInfoClick }: { zh: string; onInfoClick?: () => void }) {
   return (
-    <div className="mt-3">
+    <div className="mt-3 flex items-center justify-between">
       <h2 className="text-[21px] font-black tracking-[0.03em] text-foreground">{zh}</h2>
+      {onInfoClick && (
+        <button
+          onClick={onInfoClick}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border text-xs font-bold text-muted-foreground transition hover:border-primary hover:text-primary"
+        >
+          ?
+        </button>
+      )}
     </div>
   )
 }
+
+const PERMA_GARDEN_INFO: { title: string; desc: string }[] = [
+  {
+    title: '五個花盆，對應五個 PERMA 面向',
+    desc: 'P情緒、E投入、R連結、M意義、A成就，每完成一次練習，對應面向的花盆就會累積經驗值、慢慢長高。',
+  },
+  {
+    title: '長滿了，就開花收割',
+    desc: '每個花盆的經驗值上限是 50，只要當月累積滿 50，這個面向就會開出一朵花，被 Bouba 收割起來。',
+  },
+  {
+    title: '每個月初，花盆會重新歸零',
+    desc: '五個花盆的經驗值都是「當月」累積，每個月 1 號會歸零重新開始，讓你在新的一個月繼續努力開花。',
+  },
+  {
+    title: '「一起種了 X 朵花」是總收成',
+    desc: '每個月、每個面向收割下來的花朵，會一直累加下去，就是上面「你和 Bouba 一起種了 X 朵花」的總數，代表你們一起累積的幸福旅程。',
+  },
+]
 
 function LoadingState() {
   return (
@@ -1511,6 +1538,7 @@ function ProfilePage() {
   const [nameValue, setNameValue] = useState<string>(name ?? '')
   const [editingName, setEditingName] = useState(false)
   const [savingName, setSavingName] = useState(false)
+  const [showPermaInfoModal, setShowPermaInfoModal] = useState(false)
   const totalMinutes = totalCount * 5
   const practiceTime = formatPracticeTime(totalMinutes, t)
 
@@ -1561,7 +1589,7 @@ function ProfilePage() {
 
   return (
     <>
-      <div className="animate-fade-up mx-auto max-w-md pb-4">
+      <div className="animate-fade-up mx-auto max-w-3xl pb-4">
         <Header />
 
         <div className="flex flex-col gap-4 px-5 pt-5">
@@ -1651,12 +1679,42 @@ function ProfilePage() {
 
         {/* 我的健心夥伴（盆栽 + 吉祥物 + PERMA 種子） */}
         <div>
-          <SectionLabel zh={t('幸福經驗值')} />
+          <SectionLabel zh={t('幸福經驗值')} onInfoClick={() => setShowPermaInfoModal(true)} />
           <p className="mt-3 whitespace-pre-line text-center text-sm font-bold" style={{ color: '#876B5F' }}>
             {t('你和Bouba一起種了{n}朵花～\nBouba覺得跟你一起種花非常幸福ㄛ！', { n: String(harvestedFlowers) })}
           </p>
           <PartnerPlanter experience={experience} />
         </div>
+
+        {showPermaInfoModal && (
+          <div
+            className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+            onClick={() => setShowPermaInfoModal(false)}
+          >
+            <div
+              className="w-full max-w-md rounded-3xl bg-card p-6 shadow-soft"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="relative mb-4 flex items-center justify-center">
+                <p className="text-sm font-extrabold text-foreground">{t('幸福經驗值是怎麼來的？')}</p>
+                <button
+                  onClick={() => setShowPermaInfoModal(false)}
+                  className="absolute right-0 text-muted-foreground hover:text-foreground"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto">
+                {PERMA_GARDEN_INFO.map((info) => (
+                  <div key={info.title}>
+                    <p className="text-xs font-extrabold text-foreground">{t(info.title)}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{t(info.desc)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 健心紀錄日曆 */}
         <GratitudeCalendar initialEntries={initialEntries} initialWoopEntries={initialWoopEntries} userId={userId} />
