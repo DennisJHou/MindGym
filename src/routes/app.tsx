@@ -84,8 +84,8 @@ function TopHeader() {
       {/* safe-area padding 疊加在「內容列之上」：header 總高 = safe-area + 56px。
           內容列固定 h-14（56px），不被瀏海/動態島的 inset 壓縮，圖示才不會跑位。 */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#FEFAF0]/95 shadow-[0_3px_12px_rgba(0,0,0,0.05)] backdrop-blur-md pt-[env(safe-area-inset-top)]">
-        {/* mx-auto max-w-md：跟內容欄位、底部導覽列、浮標同一欄位對齊，避免畫面變寬時 logo/icons 貼著瀏覽器邊緣、跟內容欄位對不齊 */}
-        <div className="mx-auto flex h-14 max-w-md items-center justify-between px-5">
+        {/* mx-auto max-w-3xl：跟內容欄位、底部導覽列、浮標同一欄位對齊，避免畫面變寬時 logo/icons 貼著瀏覽器邊緣、跟內容欄位對不齊 */}
+        <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-5">
           {/* 左側佔位（維持 logo 置中） */}
           <div className="w-24" />
 
@@ -631,7 +631,7 @@ function BottomNav({ hidden }: { hidden: boolean }) {
         hidden ? 'translate-y-full' : 'translate-y-0'
       }`}
     >
-      <div className="mx-auto flex max-w-md items-stretch justify-around">
+      <div className="mx-auto flex max-w-3xl items-stretch justify-around">
         {tabs.map((tab) => {
           const isActive = pathname === tab.to || pathname.startsWith(tab.to + '/')
           return (

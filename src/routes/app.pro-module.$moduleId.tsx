@@ -223,7 +223,7 @@ function ProModulePlayer() {
   const name = module.practitioner_name || t('你的專業夥伴')
 
   return (
-    <div className="mx-auto max-w-md animate-fade-up px-5 pb-28 pt-3">
+    <div className="mx-auto max-w-3xl animate-fade-up px-5 pb-28 pt-3">
       {/* 頁首列：返回 + 標題 + ⋯選單 */}
       <div className="mb-4 flex items-center gap-2">
         <button

@@ -70,6 +70,7 @@ export const home: Record<string, Translation> = {
     en: 'Connects to the need for competence in Self-Determination Theory. Striving toward, achieving, and mastering goals builds self-efficacy — a dimension of well-being independent of emotion or relationships.',
   },
   '我的日程': { 'zh-CN': '我的日程', en: 'My Schedule' },
+  '所有練習': { 'zh-CN': '所有练习', en: 'All Practices' },
   '最新上架': { 'zh-CN': '最新上架', en: 'New Arrivals' },
   '最熱門': { 'zh-CN': '最热门', en: 'Most Popular' },
   '今': { 'zh-CN': '今', en: 'Today' },

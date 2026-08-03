@@ -404,7 +404,7 @@ function WoopFlow() {
           <WoopMapCard wish={wish} outcome={outcome} obstacle={obstacle} plan={plan} ifThen={ifThen} date={today} />
         </div>
 
-        <div className="animate-fade-up mx-auto max-w-md px-5 pt-4 pb-8">
+        <div className="animate-fade-up mx-auto max-w-3xl px-5 pt-4 pb-8">
           <Link
             to="/app/home"
             className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#542916] bg-[#FEFAF0] text-[#542916] shadow-soft transition active:scale-90"
@@ -634,7 +634,7 @@ function WoopFlow() {
     : meta.question
 
   return (
-    <div className="animate-fade-up mx-auto max-w-md px-5 pt-4 pb-8">
+    <div className="animate-fade-up mx-auto max-w-3xl px-5 pt-4 pb-8">
       {/* 返回鈕（跟感恩日記／自我慈悲一致：咖啡色描邊圓圈，回上一步；第一步時回開場介紹） */}
       <button
         type="button"
@@ -840,12 +840,12 @@ function IntroScreen({ onStart }: { onStart: () => void }) {
   const permaBoosts = getPermaBoosts(t)
 
   return (
-    <div className="animate-fade-up mx-auto max-w-md px-5 pt-4 pb-8">
-      <div className="relative left-1/2 right-1/2 -mx-[50vw] h-[170px] w-screen overflow-hidden">
+    <div className="animate-fade-up mx-auto max-w-3xl px-5 pt-4 pb-8">
+      <div className="relative left-1/2 right-1/2 -mx-[50vw] -mt-4 w-screen overflow-hidden">
         <img
           src={woopBanner}
           alt=""
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+          className="pointer-events-none block h-auto w-full"
         />
         <Link
           to="/app/home"

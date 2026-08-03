@@ -583,13 +583,13 @@ function Intro({
 }) {
   const { t } = useLanguage()
   return (
-    <div className="animate-fade-up mx-auto max-w-md px-5 pt-4 pb-8">
+    <div className="animate-fade-up mx-auto max-w-3xl px-5 pt-4 pb-8">
       {/* 愛心橫幅 + 3 分鐘標記（比照感恩日記進入頁） */}
-      <div className="relative left-1/2 right-1/2 -mx-[50vw] -mt-4 h-[170px] w-screen overflow-hidden">
+      <div className="relative left-1/2 right-1/2 -mx-[50vw] -mt-4 w-screen overflow-hidden">
         <img
           src={processGoalBanner}
           alt=""
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+          className="pointer-events-none block h-auto w-full"
         />
         <button
           onClick={onGoBack}

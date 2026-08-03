@@ -550,13 +550,13 @@ function IntroStage({
   const permaBoosts = getPermaBoosts(t)
 
   return (
-    <div className="animate-fade-up mx-auto max-w-md px-5 pt-4 pb-8">
+    <div className="animate-fade-up mx-auto max-w-3xl px-5 pt-4 pb-8">
       {/* 愛心橫幅 + 5 分鐘標記 */}
-      <div className="relative -mx-5 h-[170px] overflow-hidden">
+      <div className="relative left-1/2 right-1/2 -mx-[50vw] -mt-4 w-screen overflow-hidden">
         <img
           src={heartsBanner}
           alt=""
-          className="pointer-events-none absolute bottom-[-10px] left-1/2 w-[430px] max-w-none -translate-x-1/2"
+          className="pointer-events-none block h-auto w-full"
         />
         <button
           onClick={onGoBack}
@@ -675,13 +675,13 @@ function IntroStage({
       <div className="flex gap-3">
         <button
           onClick={() => onChangeDifficulty('basic')}
-          className={`relative flex aspect-square flex-1 items-end justify-center overflow-hidden rounded-[18px] border-[3px] border-gold-deep bg-gold pb-3.5 transition active:scale-[0.98] ${
+          className={`relative flex flex-1 items-center justify-center overflow-hidden rounded-[18px] border-[3px] border-gold-deep bg-gold py-4 transition active:scale-[0.98] ${
             difficulty === 'basic' ? 'ring-2 ring-gold-deep ring-offset-2 ring-offset-background' : ''
           }`}
         >
           <span className="text-[30px] font-black tracking-[0.04em] text-cream [text-shadow:0_2px_0_rgba(132,90,30,0.4)]">{t('初階練習')}</span>
         </button>
-        <div className="relative flex aspect-square flex-1 cursor-not-allowed select-none items-end justify-center overflow-hidden rounded-[18px] border-[3px] border-[#6b5b50] bg-[#6b5b50] pb-3.5">
+        <div className="relative flex flex-1 cursor-not-allowed select-none items-center justify-center overflow-hidden rounded-[18px] border-[3px] border-[#6b5b50] bg-[#6b5b50] py-4">
           <span className="absolute right-2.5 top-2.5 rounded-full bg-black/25 px-2 py-0.5 text-[10px] font-bold text-white">{t('施工中')}</span>
           <span className="text-[30px] font-black tracking-[0.04em] text-[#cabcae]">{t('進階練習')}</span>
         </div>
@@ -785,7 +785,7 @@ function WritingStage({
 
   return (
     <>
-    <div className="animate-fade-up mx-auto max-w-md px-5 pt-4 pb-8">
+    <div className="animate-fade-up mx-auto max-w-3xl px-5 pt-4 pb-8">
       {/* Back button */}
       <button
         onClick={onBack}
@@ -1184,7 +1184,7 @@ function SummaryStage({
   const isFallback = !summaryResult && !!fallbackResult
 
   return (
-    <div className="animate-fade-up mx-auto max-w-md px-5 pt-4 pb-8">
+    <div className="animate-fade-up mx-auto max-w-3xl px-5 pt-4 pb-8">
       <div className="relative min-h-[96px]">
         {/* 返回鍵：編輯模式回上一頁改日記、唯讀模式回結束頁 */}
         <button
@@ -1666,7 +1666,7 @@ function CelebrateStage({
   }
 
   return (
-    <div className="animate-fade-up mx-auto flex max-w-md flex-col items-center px-5 pt-4 pb-8">
+    <div className="animate-fade-up mx-auto flex max-w-3xl flex-col items-center px-5 pt-4 pb-8">
       {/* 返回鍵：回到 AI 日記頁面查看（唯讀，不重新生成） */}
       <button
         onClick={onBack}
