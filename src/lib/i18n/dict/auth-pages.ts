@@ -6,10 +6,35 @@ export const authPages: Record<string, Translation> = {
     'zh-CN': '发送失败，请确认 email 后再试一次。',
     en: 'Failed to send — please check your email and try again.',
   },
-  '驗證碼錯誤或已過期，請重新輸入。': {
-    'zh-CN': '验证码错误或已过期，请重新输入。',
-    en: 'Incorrect or expired code — please try again.',
+  '請先輸入 email，才能寄送重設密碼信。': {
+    'zh-CN': '请先输入 email，才能发送重设密码信。',
+    en: 'Please enter your email first so we can send a password reset link.',
   },
+  '已寄出重設密碼信，請至信箱查收。': {
+    'zh-CN': '已发送重设密码信，请至邮箱查收。',
+    en: 'A password reset email has been sent — please check your inbox.',
+  },
+  'Email 或密碼錯誤，請再試一次。': {
+    'zh-CN': 'Email 或密码错误，请再试一次。',
+    en: 'Incorrect email or password — please try again.',
+  },
+  '註冊失敗，請確認 email 格式或稍後再試。': {
+    'zh-CN': '注册失败，请确认 email 格式或稍后再试。',
+    en: 'Sign-up failed — please check your email format or try again later.',
+  },
+  '請至信箱查收驗證信，完成後即可登入。': {
+    'zh-CN': '请至邮箱查收验证信，完成后即可登录。',
+    en: 'Please check your email for a verification link — once confirmed, you can log in.',
+  },
+  '輸入密碼': { 'zh-CN': '输入密码', en: 'Enter your password' },
+  '登入': { 'zh-CN': '登录', en: 'Log in' },
+  '註冊': { 'zh-CN': '注册', en: 'Sign up' },
+  '登入中…': { 'zh-CN': '登录中…', en: 'Logging in…' },
+  '建立帳號中…': { 'zh-CN': '创建账号中…', en: 'Creating account…' },
+  '還沒有帳號？註冊新帳號': { 'zh-CN': '还没有账号？注册新账号', en: "Don't have an account? Sign up" },
+  '已有帳號？前往登入': { 'zh-CN': '已有账号？前往登录', en: 'Already have an account? Log in' },
+  '忘記密碼？': { 'zh-CN': '忘记密码？', en: 'Forgot password?' },
+  '用 Apple 登入': { 'zh-CN': '用 Apple 登录', en: 'Sign in with Apple' },
   '嗨，很高興認識你！歡迎來到 PSY by PSY 心理健身房。': {
     'zh-CN': '嗨，很高兴认识你！欢迎来到 PSY by PSY 心理健身房。',
     en: 'Hi, nice to meet you! Welcome to PSY by PSY Mental Fitness Gym.',
@@ -20,12 +45,6 @@ export const authPages: Record<string, Translation> = {
   },
   'PSY by PSY 教練': { 'zh-CN': 'PSY by PSY 教练', en: 'PSY by PSY Coach' },
   '輸入 email': { 'zh-CN': '输入 email', en: 'Enter your email' },
-  '輸入 6 位數驗證碼': { 'zh-CN': '输入 6 位数验证码', en: 'Enter the 6-digit code' },
-  '寄送中…': { 'zh-CN': '发送中…', en: 'Sending…' },
-  '用 Email 登入': { 'zh-CN': '用 Email 登录', en: 'Log in with Email' },
-  '驗證中…': { 'zh-CN': '验证中…', en: 'Verifying…' },
-  '確認驗證碼': { 'zh-CN': '确认验证码', en: 'Confirm Code' },
-  '重新輸入 email': { 'zh-CN': '重新输入 email', en: 'Re-enter email' },
   '或': { 'zh-CN': '或', en: 'or' },
   '用 Google 登入': { 'zh-CN': '用 Google 登录', en: 'Log in with Google' },
   '請點右下角／右上角的「⋯」選單，選擇「用外部瀏覽器開啟」。': {
@@ -130,9 +149,9 @@ export const authPages: Record<string, Translation> = {
     en: 'We retain your data only for as long as necessary to provide the Service, and we take reasonable technical and organizational measures to protect it. Data is transmitted using HTTPS encryption.',
   },
   '六、你的權利': { 'zh-CN': '六、你的权利', en: '6. Your Rights' },
-  '你有權查詢、更正或刪除你的個人資料。你可以在 App 內刪除自己的紀錄與貼文，或透過下方聯絡方式要求刪除整個帳號與相關資料。': {
-    'zh-CN': '你有权查询、更正或删除你的个人资料。你可以在 App 内删除自己的记录与帖子，或通过下方联络方式要求删除整个账号与相关资料。',
-    en: 'You have the right to access, correct, or delete your personal data. You can delete your own records and posts within the app, or contact us below to request deletion of your entire account and related data.',
+  '你有權查詢、更正或刪除你的個人資料。你可以在 App 內刪除自己的紀錄與貼文，也可以直接在「我的健心檔案」頁面的帳號設定中刪除整個帳號與相關資料。': {
+    'zh-CN': '你有权查询、更正或删除你的个人资料。你可以在 App 内删除自己的记录与帖子，也可以直接在「我的健心档案」页面的账号设置中删除整个账号与相关资料。',
+    en: 'You have the right to access, correct, or delete your personal data. You can delete your own records and posts within the app, and delete your entire account and related data directly from the account settings on your profile page.',
   },
   '七、兒童隱私': { 'zh-CN': '七、儿童隐私', en: '7. Children’s Privacy' },
   '本服務並非針對 13 歲以下兒童設計，我們不會在知情的情況下蒐集兒童的個人資料。': {

@@ -256,4 +256,15 @@ export const profile: Record<string, Translation> = {
     'zh-CN': '里面有漂亮的山、星星和森林，每一天都是一闪一闪亮晶晶的好日子。',
     en: 'Inside there are beautiful mountains, stars, and forests — every day sparkles and shines.',
   },
+
+  // 帳號設定
+  '帳號設定': { 'zh-CN': '账号设置', en: 'Account Settings' },
+  '刪除帳號': { 'zh-CN': '删除账号', en: 'Delete Account' },
+  '確定要刪除帳號嗎？此操作無法復原，所有紀錄將永久刪除。': {
+    'zh-CN': '确定要删除账号吗？此操作无法复原，所有记录将永久删除。',
+    en: 'Delete your account? This cannot be undone — all your records will be permanently deleted.',
+  },
+  '確定刪除': { 'zh-CN': '确定删除', en: 'Delete' },
+  '刪除中…': { 'zh-CN': '删除中…', en: 'Deleting…' },
+  '刪除失敗，請稍後再試。': { 'zh-CN': '删除失败，请稍后再试。', en: 'Failed to delete — please try again later.' },
 }
