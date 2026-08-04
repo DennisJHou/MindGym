@@ -4,6 +4,7 @@ import { WorkshopTextarea, CompletionActions } from '../components/workshop/Work
 import { PrimaryCta } from '../components/PrimaryCta'
 import { TheorySection } from '../components/TheorySection'
 import { PermaGrowthCard } from '../components/PermaGrowthCard'
+import { DateSwipeSheet } from '../components/DateSwipeSheet'
 import woopBanner from '../assets/ui/WOOP目標實踐 封面與內頁.png'
 import { supabase } from '../lib/supabase'
 import { insertCommunityPost, markStreak } from '../lib/communityPost'
@@ -783,48 +784,23 @@ function WoopFlow() {
       {/* 修改日期 bottom sheet（版型同感恩日記）：今天起算的一週，讓「這週四要跟主管談」
           這種目標也放得進來。 */}
       {showDateSheet && (
-        <div
-          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40"
-          onClick={() => setShowDateSheet(false)}
-        >
-          <div
-            className="animate-slide-up w-full max-w-md rounded-t-3xl bg-card p-6 pb-[calc(2rem+env(safe-area-inset-bottom))] shadow-soft"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <p className="text-sm font-extrabold text-foreground">{t('選擇目標日期')}</p>
-              <button
-                type="button"
-                onClick={() => setShowDateSheet(false)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="flex flex-col gap-2">
-              {Array.from({ length: 7 }, (_, i) => addDays(new Date(), i)).map((date, i) => {
-                const active = isoLocalDate(date) === targetIso
-                const label = i === 0 ? t('今天') : i === 1 ? t('明天') : formatShortDate(date, language)
-                return (
-                  <button
-                    key={isoLocalDate(date)}
-                    type="button"
-                    onClick={() => {
-                      setTargetDate(date)
-                      setShowDateSheet(false)
-                    }}
-                    className={`flex items-center justify-between rounded-2xl px-4 py-3 text-left transition active:scale-[0.98] ${
-                      active ? 'bg-primary/10 ring-1 ring-primary' : 'bg-muted/50'
-                    }`}
-                  >
-                    <span className="text-sm font-bold text-foreground">{label}</span>
-                    <span className="text-xs text-muted-foreground">{formatDate(date, language)}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </div>
+        <DateSwipeSheet
+          title={t('選擇目標日期')}
+          hint={t('↑ 上下滑動選擇日期 ↓')}
+          confirmLabel={t('確定')}
+          selectedIso={targetIso}
+          onClose={() => setShowDateSheet(false)}
+          onConfirm={(date) => {
+            setTargetDate(date)
+            setShowDateSheet(false)
+          }}
+          options={Array.from({ length: 7 }, (_, i) => addDays(new Date(), i)).map((date, i) => ({
+            iso: isoLocalDate(date),
+            label: i === 0 ? t('今天') : i === 1 ? t('明天') : formatShortDate(date, language),
+            sublabel: formatDate(date, language),
+            date,
+          }))}
+        />
       )}
     </div>
   )
