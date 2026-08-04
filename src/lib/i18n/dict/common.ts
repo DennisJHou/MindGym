@@ -9,6 +9,7 @@ export const common: Record<string, Translation> = {
   '送出中…': { 'zh-CN': '提交中…', en: 'Submitting…' },
   '登出': { 'zh-CN': '登出', en: 'Log out' },
   '確定': { 'zh-CN': '确定', en: 'Confirm' },
+  '↑ 上下滑動選擇日期 ↓': { 'zh-CN': '↑ 上下滑动选择日期 ↓', en: '↑ Swipe to pick a date ↓' },
   '取消': { 'zh-CN': '取消', en: 'Cancel' },
   '儲存': { 'zh-CN': '保存', en: 'Save' },
   '編輯': { 'zh-CN': '编辑', en: 'Edit' },

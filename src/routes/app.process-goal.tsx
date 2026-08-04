@@ -10,6 +10,7 @@ import { useStageBack } from '../lib/useStageBack'
 import AiProgressBar from '../components/AiProgressBar'
 import VoiceInput from '../components/pretest/VoiceInput'
 import { PermaGrowthCard } from '../components/PermaGrowthCard'
+import { DateSwipeSheet } from '../components/DateSwipeSheet'
 import { TheorySection } from '../components/TheorySection'
 import { type Privacy, DEFAULT_PRIVACY, PRIVACY_OPTIONS, privacyToFields } from '../lib/privacy'
 import processGoalBanner from '../assets/ui/process-goal-intro-banner.png'
@@ -146,48 +147,23 @@ function DateSelector({ selectedDate, onChange }: { selectedDate: Date; onChange
         </button>
       </div>
       {showSheet && (
-        <div
-          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40"
-          onClick={() => setShowSheet(false)}
-        >
-          <div
-            className="animate-slide-up w-full max-w-md rounded-t-3xl bg-card p-6 pb-[calc(2rem+env(safe-area-inset-bottom))] shadow-soft"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <p className="text-sm font-extrabold text-foreground">{t('選擇紀錄日期')}</p>
-              <button
-                onClick={() => setShowSheet(false)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="flex flex-col gap-2">
-              {[
-                { label: t('今天'), date: today },
-                { label: t('昨天'), date: yesterday },
-              ].map(({ label, date }) => {
-                const active = selectedIso === isoLocalDate(date)
-                return (
-                  <button
-                    key={label}
-                    onClick={() => {
-                      onChange(date)
-                      setShowSheet(false)
-                    }}
-                    className={`flex items-center justify-between rounded-2xl px-4 py-3 text-left transition active:scale-[0.98] ${
-                      active ? 'bg-primary/10 ring-1 ring-primary' : 'bg-muted/50'
-                    }`}
-                  >
-                    <span className="text-sm font-bold text-foreground">{label}</span>
-                    <span className="text-xs text-muted-foreground">{formatDate(date, t)}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </div>
+        <DateSwipeSheet
+          title={t('選擇紀錄日期')}
+          hint={t('↑ 上下滑動選擇日期 ↓')}
+          confirmLabel={t('確定')}
+          selectedIso={selectedIso}
+          onClose={() => setShowSheet(false)}
+          onConfirm={(date) => {
+            onChange(date)
+            setShowSheet(false)
+          }}
+          options={[today, yesterday].map((date) => ({
+            iso: isoLocalDate(date),
+            label: isoLocalDate(date) === isoLocalDate(today) ? t('今天') : t('昨天'),
+            sublabel: formatDate(date, t),
+            date,
+          }))}
+        />
       )}
     </>
   )
