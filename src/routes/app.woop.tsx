@@ -817,7 +817,7 @@ function IntroScreen({ onStart }: { onStart: () => void }) {
 
   return (
     <div className="animate-fade-up mx-auto max-w-3xl px-5 pt-4 pb-8">
-      <div className="relative left-1/2 right-1/2 -mx-[50vw] -mt-4 w-screen overflow-hidden">
+      <div className="relative left-1/2 right-1/2 -mx-[50cqw] -mt-4 w-[100cqw] overflow-hidden">
         <img
           src={woopBanner}
           alt=""
