@@ -88,6 +88,37 @@ html.native-app [contenteditable='true'] {
   user-select: text;
 }
 
+/* ── 桌面網頁版「手機外框」──────────────────────────────────────────
+   問題：練習頁封面圖用「滿版出血」手法（-mx-[50vw] + w-screen）撐滿整個
+   瀏覽器視窗，在手機上剛好貼齊螢幕邊緣，但桌面寬螢幕開網頁版時會被撐到
+   異常巨大。App 版的 header／底部導覽列本身也是 fixed 滿版，不受任何
+   容器寬度影響。
+
+   .frame-width：純粹「網頁版收窄到手機寬度並置中」的寬度規則，套在三個
+   地方——(a) __root.tsx 的 .app-frame（一般頁面內容）、(b) app.tsx 的
+   <header>、(c) app.tsx 的 <nav>（底部導覽列）。三者都是 fixed／一般
+   flow 各自獨立的元素，所以「置中欄寬」這條規則本身也要各自套用，不能
+   只包一層父層外框就好（實測 container-type 並不會讓子孫的 position:
+   fixed 元素改吃這層容器當 containing block，fixed 元素還是相對『真正
+   的瀏覽器視窗』定位，所以 header／底部導覽列必須各自加這個 class）。
+
+   只在網頁版套用（selector 要求 html 不能有 native-app class）——
+   App 版（含 iPad／橫向）一律不吃這條規則，寬度行為與新增前完全一致。
+
+   .app-frame 另外多開一個 container-type: inline-size，讓練習頁封面圖的
+   出血計算基準（cqw，container query units）從「整個瀏覽器視窗」（原本用
+   vw）改成「這個容器本身」。App 版因為 .app-frame 寬度沒有上限（就是
+   裝置寬度本身），算出來的 cqw 結果跟過去的 vw 完全一樣，行為 0 改變；
+   網頁版因為寬度被收窄，出血圖才會跟著等比例縮小、不再撐爆瀏覽器。 */
+html:not(.native-app) .frame-width {
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.app-frame {
+  container-type: inline-size;
+}
+
 /* 字體大小設定（無障礙大字模式）。所有 rem 字級會隨 html font-size 一起放大。 */
 html {
   font-size: 16px;
