@@ -22,11 +22,12 @@ export type WoopReminder = {
 }
 
 /**
- * 抓「目標日期是今天」的 WOOP，最新一則。
- * 這個查詢本身就是提醒卡的生命週期：明天再查，昨天設定的（target_date 已不是
- * 今天）自然就查不到、安靜消失——不需要額外的清除或標記過期邏輯。
+ * 抓「目標日期是今天」的所有 WOOP（可能不只一則——同一天寫了好幾個 if-then）。
+ * 依建立時間新到舊排序。這個查詢本身就是提醒卡的生命週期：明天再查，昨天設定的
+ * （target_date 已不是今天）自然就查不到、安靜消失——不需要額外的清除或標記過期
+ * 邏輯。
  */
-export async function fetchTodayWoopReminder(userId: string): Promise<WoopReminder | null> {
+export async function fetchTodayWoopReminders(userId: string): Promise<WoopReminder[]> {
   const today = isoLocalDate(new Date())
   const { data, error } = await supabase
     .from('gratitude_entries')
@@ -37,25 +38,27 @@ export async function fetchTodayWoopReminder(userId: string): Promise<WoopRemind
     .limit(20)
   if (error || !data) {
     if (error) console.error('[woop reminder fetch]', error)
-    return null
+    return []
   }
   // target_date 存在 jsonb payload 裡，PostgREST 篩選 jsonb 欄位在 payload 尚未
   // 建立時會整個查詢失敗（欄位不存在），所以改為抓最近幾則後在前端篩，migration
   // 未跑時也不會整張卡壞掉、只是篩不出東西、卡片不顯示。
   type Row = { id: string; payload: Record<string, unknown> | null }
   const rows = data as unknown as Row[]
-  const match = rows.find((r) => r.payload?.v === 'woop' && r.payload?.target_date === today)
-  if (!match || !match.payload) return null
-  const p = match.payload as Record<string, unknown>
-  return {
-    id: match.id,
-    wish: (p.wish as string) ?? '',
-    outcome: (p.outcome as string) ?? '',
-    obstacle: (p.obstacle as string) ?? '',
-    plan: (p.plan as string) ?? '',
-    targetDate: today,
-    done: p.done === true,
-  }
+  return rows
+    .filter((r) => r.payload?.v === 'woop' && r.payload?.target_date === today)
+    .map((r) => {
+      const p = r.payload as Record<string, unknown>
+      return {
+        id: r.id,
+        wish: (p.wish as string) ?? '',
+        outcome: (p.outcome as string) ?? '',
+        obstacle: (p.obstacle as string) ?? '',
+        plan: (p.plan as string) ?? '',
+        targetDate: today,
+        done: p.done === true,
+      }
+    })
 }
 
 // 完成當天的 WOOP：成就力 +5（跟完成頁的加分一致），不做連續天數、不記錄「沒做到」。

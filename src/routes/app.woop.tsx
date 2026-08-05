@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { createFileRoute, Link, useNavigate, useRouter } from '@tanstack/react-router'
-import { WorkshopTextarea, CompletionActions } from '../components/workshop/WorkshopUI'
+import { WorkshopTextarea } from '../components/workshop/WorkshopUI'
 import { PrimaryCta } from '../components/PrimaryCta'
 import { TheorySection } from '../components/TheorySection'
 import { PermaGrowthCard } from '../components/PermaGrowthCard'
 import { DateSwipeSheet } from '../components/DateSwipeSheet'
 import woopBanner from '../assets/ui/WOOP目標實踐 封面與內頁.png'
 import { supabase } from '../lib/supabase'
-import { insertCommunityPost, markStreak } from '../lib/communityPost'
+import { insertCommunityPost, markStreak, updateCommunityPrivacy } from '../lib/communityPost'
 import { scheduleWoopReminder } from '../lib/localNotifications'
 import { isoLocalDate } from '../lib/date'
 import { downloadNodeAsPng, isMobileDevice } from '../lib/shareImage'
@@ -247,8 +247,12 @@ function WoopFlow() {
   const [exampleIdx, setExampleIdx] = useState(0)
 
   const [userId, setUserId] = useState<string | null>(null)
-  const [publishing, setPublishing] = useState(false)
-  const [published, setPublished] = useState(false)
+  // 完成頁機制與感恩日記／自我慈悲一致：一到完成頁就用預設隱私自動存檔，
+  // 「把你的 WOOP 地圖分享出去」的選項改成即時更新已存檔的那筆貼文，
+  // 不再有獨立的「發佈」按鈕。
+  const [savedEntryId, setSavedEntryId] = useState<string | null>(null)
+  const [completing, setCompleting] = useState(false) // P 步驟按「完成」時，存檔中的 loading
+  const [finishing, setFinishing] = useState(false) // 「結束今天練習」按下後的 loading
   const [sharing, setSharing] = useState(false)
   const [privacy, setPrivacy] = useState<Privacy>(DEFAULT_PRIVACY)
 
@@ -277,6 +281,27 @@ function WoopFlow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase])
 
+  // 貼文在完成頁一出現就已存檔，這時 Bouba 的口袋方案通常還沒回來；使用者
+  // 事後才加入的備案，即時補寫回同一筆貼文的 payload.backup_plans。
+  useEffect(() => {
+    if (!savedEntryId) return
+    void supabase
+      .from('gratitude_entries')
+      .update({
+        payload: {
+          v: 'woop',
+          wish: wish.trim(),
+          outcome: outcome.trim(),
+          obstacle: obstacle.trim(),
+          plan: plan.trim(),
+          target_date: targetIso,
+          ...(backupPlans.length > 0 ? { backup_plans: backupPlans } : {}),
+        },
+      })
+      .eq('id', savedEntryId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backupPlans, savedEntryId])
+
   const values: Record<StepKey, string> = { wish, outcome, obstacle, plan }
   const setters: Record<StepKey, (v: string) => void> = {
     wish: setWish,
@@ -296,28 +321,21 @@ function WoopFlow() {
       ? t('明天的目標')
       : t('{date}的目標', { date: formatShortDate(targetDate, language) })
 
-  const next = () =>
-    setPhase((p) => (p === 'intro' ? 1 : p === 4 ? 'done' : ((p as number) + 1) as 2 | 3 | 4))
+  const next = async () => {
+    if (phase === 4) {
+      // 完成第四步時就存檔（跟感恩日記一致：完成頁出現前就先寫進 DB，之後
+      // 「分享出去」的隱私選項只是即時更新這筆已存在的貼文）。
+      if (completing) return
+      setCompleting(true)
+      await performSave()
+      setCompleting(false)
+      setPhase('done')
+      return
+    }
+    setPhase((p) => (p === 'intro' ? 1 : ((p as number) + 1) as 2 | 3 | 4))
+  }
   const back = () =>
     setPhase((p) => (p === 1 ? 'intro' : (((p as number) - 1) as 1 | 2 | 3)))
-
-  const restart = () => {
-    setWish('')
-    setOutcome('')
-    setObstacle('')
-    setPlan('')
-    setTargetDate(defaultTargetDate())
-    setShowDateSheet(false)
-    setShowExample(false)
-    setExampleIdx(0)
-    setPublishing(false)
-    setPublished(false)
-    setCoach(null)
-    setCoachLoading(false)
-    setShowAlternatives(false)
-    setBackupPlans([])
-    setPhase('intro')
-  }
 
   const today = formatDate(new Date(), language)
   const downloadLabel = isMobileDevice() ? t('分享 WOOP 地圖') : t('下載 WOOP 地圖')
@@ -334,9 +352,11 @@ function WoopFlow() {
     }
   }
 
-  const publish = async () => {
-    if (!userId || publishing) return
-    setPublishing(true)
+  // 完成第四步時呼叫一次：用當下的隱私設定（預設值）把貼文寫進 DB，並核發
+  // 成就力經驗值、更新連續天數、排程隔天提醒。之後使用者切換隱私選項或加入
+  // Bouba 的備案，都是對這筆已存在的貼文做即時更新，不再重新建立一筆。
+  const performSave = async (): Promise<string | null> => {
+    if (!userId) return null
     try {
       const ifThen = assembleIfThen(t, obstacle, plan)
       const entryId = await insertCommunityPost(
@@ -356,12 +376,12 @@ function WoopFlow() {
           obstacle: obstacle.trim(),
           plan: plan.trim(),
           target_date: targetIso,
-          ...(backupPlans.length > 0 ? { backup_plans: backupPlans } : {}),
         },
       )
-      setPublished(true)
-      await markStreak(userId)
-      // 幸福經驗值累加（與自我慈悲同一支 RPC）；migration 未跑時吞掉錯誤，不影響發佈。
+      if (!entryId) return null
+      setSavedEntryId(entryId)
+      void markStreak(userId)
+      // 幸福經驗值累加（與自我慈悲同一支 RPC）；migration 未跑時吞掉錯誤，不影響存檔。
       const boosts = getPermaBoosts(t)
       const deltaOf = (key: string) => boosts.find((b) => b.key === key)?.delta ?? 0
       const { error: xpError } = await supabase.rpc('increment_perma_xp', {
@@ -372,21 +392,32 @@ function WoopFlow() {
         p_delta_m: deltaOf('M'),
         p_delta_a: deltaOf('A'),
       })
-      if (xpError) console.warn('[woop publish] increment_perma_xp 尚未建立，本次未累加經驗值', xpError)
+      if (xpError) console.warn('[woop save] increment_perma_xp 尚未建立，本次未累加經驗值', xpError)
       // 原生 App 才會真的排程（isNativeApp() 把關，純網頁靜默不做事）；早上 8:00
       // 響一次，內容就是這句 If-Then 原文，不多不少。
-      if (entryId) void scheduleWoopReminder(entryId, ifThen, targetIso)
-      await router.invalidate()
-      // 與感恩日記／過程目標覺察一致：導向社群動態牆（貼文已 is_shared，會出現在牆上）。
-      navigate({
-        to: '/app/community',
-        search: entryId ? { focus: entryId } : { showEntry: 1 },
-      })
+      void scheduleWoopReminder(entryId, ifThen, targetIso)
+      return entryId
     } catch (e) {
-      console.error('[woop publish]', e)
-      setPublishing(false)
-      alert(t('發佈失敗，請稍後再試一次。'))
+      console.error('[woop save]', e)
+      return null
     }
+  }
+
+  // 完成頁切換隱私：即時更新已存檔的那筆貼文（跟感恩日記／過程目標覺察一致）。
+  const handlePrivacyChange = (next: Privacy) => {
+    setPrivacy(next)
+    if (savedEntryId && userId) void updateCommunityPrivacy(savedEntryId, userId, next)
+  }
+
+  // 「結束今天練習」：貼文已經存在，這裡只是離開到社群動態牆。
+  const handleFinish = async () => {
+    if (finishing) return
+    setFinishing(true)
+    await router.invalidate()
+    navigate({
+      to: '/app/community',
+      search: savedEntryId ? { focus: savedEntryId } : { showEntry: 1 },
+    })
   }
 
   // ── 開場介紹頁 ───────────────────────────────────────────────────────────
@@ -573,7 +604,7 @@ function WoopFlow() {
                   <button
                     key={opt.value}
                     type="button"
-                    onClick={() => setPrivacy(opt.value)}
+                    onClick={() => handlePrivacyChange(opt.value)}
                     aria-pressed={active}
                     className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
                       active ? 'border-primary bg-primary/10' : 'border-border bg-muted/40 hover:bg-muted'
@@ -598,20 +629,20 @@ function WoopFlow() {
                 )
               })}
             </div>
-            <button
-              type="button"
-              onClick={publish}
-              disabled={publishing || published || !userId}
-              className="mt-4 flex h-14 w-full items-center justify-center gap-2 rounded-full bg-gradient-primary text-base font-extrabold tracking-[0.15em] text-primary-foreground shadow-soft transition active:scale-[0.98] disabled:opacity-60"
-            >
-              {publishing ? t('發佈中…') : published ? t('已發佈') : t('發佈')}
-            </button>
-            {!userId && (
-              <p className="mt-2 text-center text-xs text-muted-foreground">{t('尚未登入，無法發佈。')}</p>
-            )}
           </div>
 
-          <CompletionActions onRestart={restart} />
+          {/* 結束今天練習（跟感恩日記／自我慈悲／過程目標覺察一致：貼文已經存好了，
+              這裡只是離開去社群動態牆） */}
+          <div className="mt-5 flex w-full flex-col gap-3">
+            <button
+              type="button"
+              onClick={handleFinish}
+              disabled={finishing}
+              className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-gradient-primary text-sm font-extrabold tracking-[0.15em] text-white shadow-soft transition active:scale-[0.98] disabled:opacity-60"
+            >
+              {t('結束今天練習')}
+            </button>
+          </div>
         </div>
       </>
     )
@@ -774,11 +805,24 @@ function WoopFlow() {
         )}
       </div>
 
-      {/* 下一步／完成 */}
-      <div className="mt-8">
-        <PrimaryCta onClick={next} variant={isLast ? 'done' : 'next'}>
-          {isLast ? t('完成') : t('下一步')}
-        </PrimaryCta>
+      {/* 上一步／下一步／完成：O／O／P 三步（idx > 0）左右並排多一顆「上一步」，
+          讓使用者不用回去點左上角小圖示，也能直接改前面的答案。 */}
+      <div className="mt-8 flex gap-3">
+        {idx > 0 && (
+          <button
+            type="button"
+            onClick={back}
+            disabled={completing}
+            className="flex h-16 flex-1 items-center justify-center rounded-full border-2 border-[#542916]/25 text-sm font-extrabold tracking-[0.1em] text-[#542916]/70 transition active:scale-[0.98] disabled:opacity-60"
+          >
+            {t('上一步')}
+          </button>
+        )}
+        <div className={idx > 0 ? 'flex-[2]' : 'flex-1'}>
+          <PrimaryCta onClick={() => void next()} disabled={completing} variant={isLast ? 'done' : 'next'}>
+            {isLast ? (completing ? t('儲存中…') : t('完成')) : t('下一步')}
+          </PrimaryCta>
+        </div>
       </div>
 
       {/* 修改日期 bottom sheet（版型同感恩日記）：今天起算的一週，讓「這週四要跟主管談」
@@ -817,7 +861,7 @@ function IntroScreen({ onStart }: { onStart: () => void }) {
 
   return (
     <div className="animate-fade-up mx-auto max-w-3xl px-5 pt-4 pb-8">
-      <div className="relative left-1/2 right-1/2 -mx-[50vw] -mt-4 w-screen overflow-hidden">
+      <div className="relative left-1/2 right-1/2 -mx-[50cqw] -mt-4 w-[100cqw] overflow-hidden">
         <img
           src={woopBanner}
           alt=""
