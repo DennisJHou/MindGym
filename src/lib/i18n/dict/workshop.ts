@@ -217,6 +217,10 @@ export const workshop: Record<string, Translation> = {
     en: 'Share your goal and your coping plan so others can cheer you on — and you can keep each other moving forward.',
   },
   '你今天的 If-Then': { 'zh-CN': '你今天的 If-Then', en: 'Your If-Then for today' },
+  '今天有 {n} 則 WOOP，左右滑動查看': {
+    'zh-CN': '今天有 {n} 则 WOOP，左右滑动查看',
+    en: 'You have {n} WOOP entries for today — swipe to see the others',
+  },
   'Bouba 想跟你說…': { 'zh-CN': 'Bouba 想跟你说…', en: 'Bouba is thinking…' },
   'Bouba 想跟你說': { 'zh-CN': 'Bouba 想跟你说', en: 'A note from Bouba' },
   'Bouba 的口袋方案': { 'zh-CN': 'Bouba 的口袋方案', en: 'Bouba’s backup ideas' },
