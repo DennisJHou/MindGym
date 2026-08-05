@@ -582,7 +582,7 @@ function Header() {
 
 function LoadingState() {
   return (
-    <div className="mx-auto max-w-md px-5 pt-4">
+    <div className="mx-auto max-w-3xl px-5 pt-4">
       <Header />
       <div className="mt-4 flex flex-col gap-4">
         {[1, 2, 3, 4].map((i) => (
@@ -1213,7 +1213,7 @@ function CommunityPage() {
         />
       )}
 
-      <div className="animate-fade-up mx-auto max-w-md px-5 pt-4 pb-8">
+      <div className="animate-fade-up mx-auto max-w-3xl px-5 pt-4 pb-8">
         <Header />
 
         <FeedModeToggle mode={mode} onChange={setMode} userId={userId} />

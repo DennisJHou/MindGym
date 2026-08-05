@@ -101,6 +101,27 @@ export const profile: Record<string, Translation> = {
     en: 'Complete more gratitude practices to see the distribution of who you feel grateful toward.',
   },
   '感恩對象的心理學意義': { 'zh-CN': '感恩对象的心理学意义', en: 'The Psychology Behind Gratitude Targets' },
+  '幸福經驗值是怎麼來的？': { 'zh-CN': '幸福经验值是怎么来的？', en: 'How do Well-Being Points work?' },
+  '五個花盆，對應五個 PERMA 面向': { 'zh-CN': '五个花盆，对应五个 PERMA 面向', en: 'Five pots, five PERMA dimensions' },
+  'P情緒、E投入、R連結、M意義、A成就，每完成一次練習，對應面向的花盆就會累積經驗值、慢慢長高。': {
+    'zh-CN': 'P情绪、E投入、R连结、M意义、A成就，每完成一次练习，对应面向的花盆就会累积经验值、慢慢长高。',
+    en: 'P Positive Emotion, E Engagement, R Relationships, M Meaning, A Accomplishment — each practice you complete adds experience to its pot, and the plant slowly grows.',
+  },
+  '長滿了，就開花收割': { 'zh-CN': '长满了，就开花收割', en: 'Full pot, full bloom' },
+  '每個花盆的經驗值上限是 50，只要當月累積滿 50，這個面向就會開出一朵花，被 Bouba 收割起來。': {
+    'zh-CN': '每个花盆的经验值上限是 50，只要当月累积满 50，这个面向就会开出一朵花，被 Bouba 收割起来。',
+    en: "Each pot caps at 50 points. Once a dimension reaches 50 in a month, it blooms into a flower and Bouba harvests it.",
+  },
+  '每個月初，花盆會重新歸零': { 'zh-CN': '每个月初，花盆会重新归零', en: 'Pots reset each month' },
+  '五個花盆的經驗值都是「當月」累積，每個月 1 號會歸零重新開始，讓你在新的一個月繼續努力開花。': {
+    'zh-CN': '五个花盆的经验值都是「当月」累积，每个月 1 号会归零重新开始，让你在新的一个月继续努力开花。',
+    en: 'All five pots track only the current month. On the 1st of each month they reset to zero, so you get a fresh start to grow more flowers.',
+  },
+  '「一起種了 X 朵花」是總收成': { 'zh-CN': '「一起种了 X 朵花」是总收成', en: '"Grown X flowers together" is the running total' },
+  '每個月、每個面向收割下來的花朵，會一直累加下去，就是上面「你和 Bouba 一起種了 X 朵花」的總數，代表你們一起累積的幸福旅程。': {
+    'zh-CN': '每个月、每个面向收割下来的花朵，会一直累加下去，就是上面「你和 Bouba 一起种了 X 朵花」的总数，代表你们一起累积的幸福旅程。',
+    en: 'Every flower harvested from every dimension, every month, keeps adding up — that\'s the "You and Bouba have grown X flowers together" total above, tracking your shared well-being journey.',
+  },
   '我的健心日記': { 'zh-CN': '我的健心日记', en: 'My Mental Training Log' },
   '{date} 的練習紀錄': { 'zh-CN': '{date} 的练习纪录', en: 'Practice log for {date}' },
   '感恩日記': { 'zh-CN': '感恩日记', en: 'Gratitude Journal' },

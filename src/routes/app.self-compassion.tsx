@@ -8,6 +8,7 @@ import { isoLocalDate } from '../lib/date'
 import { computeUnifiedStreak } from '../lib/streak'
 import { type Privacy, DEFAULT_PRIVACY, PRIVACY_OPTIONS, privacyToFields } from '../lib/privacy'
 import { PermaGrowthCard } from '../components/PermaGrowthCard'
+import { DateSwipeSheet } from '../components/DateSwipeSheet'
 import { TheorySection } from '../components/TheorySection'
 import { saveOrShareImage } from '../lib/shareImage'
 import heartsBanner from '../assets/ui/自我慈悲 內頁.png'
@@ -50,48 +51,23 @@ function DateSelector({ selectedDate, onChange }: { selectedDate: Date; onChange
         </button>
       </div>
       {showSheet && (
-        <div
-          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40"
-          onClick={() => setShowSheet(false)}
-        >
-          <div
-            className="animate-slide-up w-full max-w-md rounded-t-3xl bg-card p-6 pb-[calc(2rem+env(safe-area-inset-bottom))] shadow-soft"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <p className="text-sm font-extrabold text-foreground">{t('選擇紀錄日期')}</p>
-              <button
-                onClick={() => setShowSheet(false)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="flex flex-col gap-2">
-              {[
-                { label: t('今天'), date: today },
-                { label: t('昨天'), date: yesterday },
-              ].map(({ label, date }) => {
-                const active = selectedIso === isoLocalDate(date)
-                return (
-                  <button
-                    key={label}
-                    onClick={() => {
-                      onChange(date)
-                      setShowSheet(false)
-                    }}
-                    className={`flex items-center justify-between rounded-2xl px-4 py-3 text-left transition active:scale-[0.98] ${
-                      active ? 'bg-primary/10 ring-1 ring-primary' : 'bg-muted/50'
-                    }`}
-                  >
-                    <span className="text-sm font-bold text-foreground">{label}</span>
-                    <span className="text-xs text-muted-foreground">{formatDate(date, t)}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </div>
+        <DateSwipeSheet
+          title={t('選擇紀錄日期')}
+          hint={t('↑ 上下滑動選擇日期 ↓')}
+          confirmLabel={t('確定')}
+          selectedIso={selectedIso}
+          onClose={() => setShowSheet(false)}
+          onConfirm={(date) => {
+            onChange(date)
+            setShowSheet(false)
+          }}
+          options={[today, yesterday].map((date) => ({
+            iso: isoLocalDate(date),
+            label: isoLocalDate(date) === isoLocalDate(today) ? t('今天') : t('昨天'),
+            sublabel: formatDate(date, t),
+            date,
+          }))}
+        />
       )}
     </>
   )
@@ -413,12 +389,12 @@ function IntroStage({ onGoBack, onStart }: { onGoBack: () => void; onStart: () =
   const permaBoosts = getPermaBoosts(t)
 
   return (
-    <div className="animate-fade-up mx-auto max-w-md px-5 pt-4 pb-8">
-      <div className="relative left-1/2 right-1/2 -mx-[50vw] h-[170px] w-screen overflow-hidden">
+    <div className="animate-fade-up mx-auto max-w-3xl px-5 pt-4 pb-8">
+      <div className="relative left-1/2 right-1/2 -mx-[50vw] -mt-4 w-screen overflow-hidden">
         <img
           src={heartsBanner}
           alt=""
-          className="pointer-events-none absolute inset-0 w-full h-full object-cover"
+          className="pointer-events-none block h-auto w-full"
         />
         <button
           onClick={onGoBack}
@@ -564,7 +540,7 @@ function CalmStage({ onBack, onNext }: { onBack: () => void; onNext: () => void 
   const { t } = useLanguage()
 
   return (
-    <div className="animate-fade-up mx-auto max-w-md px-5 pt-4 pb-8">
+    <div className="animate-fade-up mx-auto max-w-3xl px-5 pt-4 pb-8">
       <button
         onClick={onBack}
         className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#542916] bg-[#FEFAF0] text-[#542916] shadow-soft transition active:scale-90"
@@ -661,7 +637,7 @@ function WritingStage({
   const { t } = useLanguage()
 
   return (
-    <div className="animate-fade-up mx-auto max-w-md px-5 pt-4 pb-8">
+    <div className="animate-fade-up mx-auto max-w-3xl px-5 pt-4 pb-8">
       <button
         onClick={onBack}
         className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#542916] bg-[#FEFAF0] text-[#542916] shadow-soft transition active:scale-90"
@@ -790,7 +766,7 @@ function ShareStage({
   }
 
   return (
-    <div className="animate-fade-up mx-auto max-w-md px-5 pt-4 pb-8">
+    <div className="animate-fade-up mx-auto max-w-3xl px-5 pt-4 pb-8">
       <button
         onClick={onBack}
         className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#542916] bg-[#FEFAF0] text-[#542916] shadow-soft transition active:scale-90"
@@ -1049,7 +1025,7 @@ function CelebrateStage({
   const { t } = useLanguage()
 
   return (
-    <div className="animate-fade-up mx-auto flex max-w-md flex-col items-center px-5 pt-4 pb-8 text-center">
+    <div className="animate-fade-up mx-auto flex max-w-3xl flex-col items-center px-5 pt-4 pb-8 text-center">
       <button
         onClick={onBack}
         className="mb-3 flex h-8 w-8 items-center justify-center self-start rounded-full border-2 border-[#542916] bg-[#FEFAF0] text-[#542916] shadow-soft transition active:scale-90"
