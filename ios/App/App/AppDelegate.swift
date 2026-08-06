@@ -8,9 +8,14 @@ import Capacitor
 class MainViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         webView?.allowsBackForwardNavigationGestures = true
-        // 關閉 WKWebView 底層 UIScrollView 的橡皮筋回彈：CSS 的 overscroll-behavior
-        // 管不到這層原生捲動，滑到頂/底繼續拉時畫面（含 fixed 導覽列）會被彈性拉動，
-        // 關掉後滑到頂/底就直接停住，不會再帶動 fixed 元素跟著位移。
+        // 保險用：Capacitor 在 prepareWebView 裡就已經設過 bounces = false
+        // （CAPBridgeViewController.swift），這行其實是重複設定，留著只防 Capacitor
+        // 日後改預設值。
+        //
+        // ⚠️ 別誤以為它能解決「滑到最上/最下出現淡藍空白」——那個回彈它擋不住
+        //    （這行早在 2026-07 就存在，build 2 已上架仍會發生）。真正的解法是
+        //    capacitor.config.ts 的 ios.scrollEnabled = false（停用外層
+        //    UIScrollView）＋ 前端把捲動搬進 .app-frame 容器。
         webView?.scrollView.bounces = false
     }
 }
