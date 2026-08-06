@@ -79,6 +79,7 @@ async function sendToToken(
   providerJwt: string,
   title: string,
   body: string,
+  route?: string,
 ): Promise<'ok' | 'gone' | 'error'> {
   const res = await fetch(`https://${APNS_HOST}/3/device/${token}`, {
     method: 'POST',
@@ -88,8 +89,12 @@ async function sendToToken(
       'apns-push-type': 'alert',
       'apns-priority': '10',
     },
+    // route 放在 aps 外層（跟 aps 平行的自訂欄位）：App 端的
+    // pushNotificationActionPerformed 監聽器會讀 notification.data.route，
+    // 點擊推播時直接導到那個頁面（見 src/lib/pushNotifications.ts）。
     body: JSON.stringify({
       aps: { alert: { title, body }, sound: 'default' },
+      ...(route ? { route } : {}),
     }),
   })
   if (res.ok) return 'ok'
@@ -112,6 +117,8 @@ Deno.serve(async (req) => {
     const payload = await req.json().catch(() => ({}))
     const title: string = payload.title || 'PSY by PSY'
     const body: string = payload.body || ''
+    // 點擊推播要跳去的頁面（例如 '/app/woop'）；不帶就不加這個欄位，行為跟以前一樣。
+    const route: string | undefined = payload.route || undefined
     if (!body) {
       return new Response('missing body', { status: 400 })
     }
@@ -138,7 +145,7 @@ Deno.serve(async (req) => {
     for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
       const batch = tokens.slice(i, i + BATCH_SIZE)
       const results = await Promise.all(
-        batch.map(({ token }) => sendToToken(token as string, jwt, title, body)),
+        batch.map(({ token }) => sendToToken(token as string, jwt, title, body, route)),
       )
       results.forEach((r, idx) => {
         if (r === 'ok') sent += 1
