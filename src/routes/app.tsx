@@ -83,7 +83,7 @@ function TopHeader() {
     <>
       {/* safe-area padding 疊加在「內容列之上」：header 總高 = safe-area + 56px。
           內容列固定 h-14（56px），不被瀏海/動態島的 inset 壓縮，圖示才不會跑位。 */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-[#FEFAF0]/95 shadow-[0_3px_12px_rgba(0,0,0,0.05)] backdrop-blur-md pt-[env(safe-area-inset-top)]">
+      <header className="frame-width fixed top-0 left-0 right-0 z-50 bg-[#FEFAF0]/95 shadow-[0_3px_12px_rgba(0,0,0,0.05)] backdrop-blur-md pt-[env(safe-area-inset-top)]">
         {/* mx-auto max-w-3xl：跟內容欄位、底部導覽列、浮標同一欄位對齊，避免畫面變寬時 logo/icons 貼著瀏覽器邊緣、跟內容欄位對不齊 */}
         <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-5">
           {/* 左側佔位（維持 logo 置中） */}
@@ -627,7 +627,7 @@ function BottomNav({ hidden }: { hidden: boolean }) {
 
   return (
     <nav
-      className={`fixed inset-x-0 bottom-0 z-50 border-t-2 border-[#542916]/12 bg-[#FEFAF0] pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgba(40,24,12,0.1)] transition-transform duration-300 ${
+      className={`frame-width fixed inset-x-0 bottom-0 z-50 border-t-2 border-[#542916]/12 bg-[#FEFAF0] pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgba(40,24,12,0.1)] transition-transform duration-300 ${
         hidden ? 'translate-y-full' : 'translate-y-0'
       }`}
     >

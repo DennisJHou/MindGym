@@ -1240,6 +1240,7 @@ function CommunityPage() {
                       anonName={anonName}
                       autoFocus={focus === entry.id}
                       isOwn={true}
+                      showRealName
                       blockedIds={blockedIds}
                       onLikeChange={(info) => handleLikeChange(entry.id, info)}
                       onCommentAdded={(c) => handleCommentAdded(entry.id, c)}
@@ -2179,6 +2180,7 @@ function EntryCard({
   userId,
   anonName,
   isOwn,
+  showRealName = false,
   blockedIds,
   autoFocus = false,
   onLikeChange,
@@ -2196,6 +2198,10 @@ function EntryCard({
   userId: string | null
   anonName: string | null
   isOwn: boolean
+  // 「我的貼文」分頁專用：無論這則貼文當初用匿名／僅限本人發佈，都改顯示
+  // 自己的本名（規格：我的貼文一律顯示本名；社群貼文／工作坊貼文不受影響，
+  // 仍照原本 anon_name 顯示，維持匿名效果）。
+  showRealName?: boolean
   blockedIds: Set<string>
   autoFocus?: boolean
   onLikeChange: (info: LikeInfo) => void
@@ -2424,7 +2430,7 @@ function EntryCard({
         />
         <div className="min-w-0 flex-1">
           <p className="truncate text-[21px] font-black tracking-[0.03em] text-foreground">
-            {localAnonName ?? t('匿名使用者')}
+            {showRealName && anonName ? anonName : (localAnonName ?? t('匿名使用者'))}
           </p>
           <div className="flex items-center gap-2">
             <p className="font-en text-sm font-semibold text-muted-foreground">{formatDate(entry.entry_date)}</p>

@@ -24,6 +24,17 @@ const config: CapacitorConfig = {
   ios: {
     // 讓 WebView 自動處理 safe-area inset，內容不被瀏海/home bar 蓋住。
     contentInset: 'always',
+    // 關閉 WKWebView 外層 UIScrollView 的捲動 → 原生橡皮筋回彈徹底消失，
+    // 不會再露出下面那行 backgroundColor 的淡藍色（回彈時露出的就是它）。
+    //
+    // ⚠️ 這一行「依賴前端」：App 的捲動已改由 .app-frame 容器負責（見 src/index.css
+    //    的 html.native-app 區塊與 src/lib/scrollContainer.ts）。若線上版沒有那段
+    //    CSS，這個 App 會完全無法捲動。
+    //    → 打包送審前，務必先確認 Vercel 線上版已含該段 CSS。
+    //
+    // 備註：不必另外設 scrollView.bounces = false，Capacitor 預設就已經是 false
+    //    （CAPBridgeViewController.prepareWebView），而且實測光靠它擋不住這個回彈。
+    scrollEnabled: false,
     // 背景色：載入遠端網站前的底色，與啟動畫面品牌淺藍一致避免閃白。
     backgroundColor: '#F0F6FF',
   },

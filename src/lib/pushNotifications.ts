@@ -51,6 +51,14 @@ export async function registerForPush(): Promise<void> {
       await PushNotifications.addListener('registrationError', (err) => {
         console.error('[push] registrationError', err)
       })
+      // 點擊推播（不管 App 當時在背景、前景，或整個被關掉才被這次點擊喚醒）：
+      // 後端在 APNs payload 最外層（跟 aps 同一層）夾帶 route，點下去就直接跳轉。
+      // 用整頁導頁而非 router.navigate()，因為這支檔案不是 React 元件、拿不到
+      // router 實例；冷啟動時 App 可能都還沒 mount，整頁導頁在任何時機都可靠。
+      await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+        const route = action.notification.data?.route as string | undefined
+        if (route) window.location.href = route
+      })
     }
     await PushNotifications.register()
   } catch (e) {
