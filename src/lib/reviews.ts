@@ -34,15 +34,20 @@ export interface ReviewRow {
 
 /** 感恩深度四層次（Lin, 2015 階層模型），與後端 weekly-digest 的 depth.level 對應。 */
 export type GratitudeDepthLevel = 'recognize' | 'feel' | 'express' | 'reciprocate'
+export type LifeThemeKey = 'work' | 'relationships' | 'health' | 'rest' | 'growth' | 'other'
 
 /**
- * 一週回顧頁的 AI 週統整分析內容（review_type='weekly_digest'，v2）。
+ * 一週回顧頁的 AI 週統整分析內容（review_type='weekly_digest'，目前為 v4，並相容舊版）。
  * 量化編碼（情緒／詞彙／感恩深度）＋ 四段敘事回饋（準確性→驚喜感→自我覺察→洞察與行動），
  * 架構依 Zeng, Chang, Lin, & Yeh (2026) 的 GenAI 整合式回饋研究。
  */
 export interface WeeklyDigestContent {
   v: number
-  emotions: { label: string; count: number }[]
+  emotions: { label: string; count: number; valence?: 'positive' | 'negative' | 'neutral' }[]
+  /** 有寫日記的日期才會有資料；score 為 -100（低落）到 +100（正向）的文字情緒效價。 */
+  emotion_trend?: { date: string; score: number; label?: string }[]
+  /** 彙整感恩、過程目標、自我慈悲與 WOOP 等所有日記的生活關注主題。 */
+  themes?: { key: LifeThemeKey; label: string; count: number }[]
   keywords?: { label: string; count: number }[]
   depth?: { level: GratitudeDepthLevel; count: number }[]
   /** v3 起每個向度是 2-3 條條列短句（string[]）；容忍 v2 舊資料的單一字串。 */
