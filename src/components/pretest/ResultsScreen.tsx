@@ -3,7 +3,6 @@ import { useRef, useState } from 'react'
 import type { InMindReport, DimensionKey } from './types'
 import { DIMENSION_CONFIGS, DIMENSION_ORDER } from './types'
 import { saveOrShareImage } from '../../lib/shareImage'
-import { getScrollTop, scrollToY } from '../../lib/scrollContainer'
 import { useLanguage } from '../../lib/i18n/context'
 
 interface Props {
@@ -365,10 +364,8 @@ export default function InMindReportPage({ report, onRestart, onComplete, onGoHo
 
       const elWidth = el.offsetWidth
       const elHeight = el.scrollHeight
-      // 截圖前先捲到頂（html2canvas 以視窗左上為基準），事後再還原。
-      // 捲動來源網頁版是 window、App 版是 .app-frame 容器，統一走 scrollContainer。
-      const prevScrollY = getScrollTop()
-      scrollToY(0)
+      const prevScrollY = window.scrollY
+      window.scrollTo(0, 0)
 
       const sourceCanvas = await html2canvas(el, {
         useCORS: true,
@@ -437,7 +434,7 @@ export default function InMindReportPage({ report, onRestart, onComplete, onGoHo
         },
       })
 
-      scrollToY(prevScrollY)
+      window.scrollTo(0, prevScrollY)
 
       const TARGET_RATIO = 9 / 16
       const sW = sourceCanvas.width

@@ -12,10 +12,9 @@ class MainViewController: CAPBridgeViewController {
         // （CAPBridgeViewController.swift），這行其實是重複設定，留著只防 Capacitor
         // 日後改預設值。
         //
-        // ⚠️ 別誤以為它能解決「滑到最上/最下出現淡藍空白」——那個回彈它擋不住
-        //    （這行早在 2026-07 就存在，build 2 已上架仍會發生）。真正的解法是
-        //    capacitor.config.ts 的 ios.scrollEnabled = false（停用外層
-        //    UIScrollView）＋ 前端把捲動搬進 .app-frame 容器。
+        // ⚠️ 別誤以為它能解決「滑到最上/最下出現淡藍空白」——那個症狀跟回彈無關
+        //    （這行早在 2026-07 就存在，build 2 已上架仍會發生）。真正的原因是
+        //    contentInset: 'always' 造成的 safe-area 內縮，解法見 capacitor.config.ts。
         webView?.scrollView.bounces = false
     }
 }

@@ -22,19 +22,21 @@ const config: CapacitorConfig = {
     cleartext: false,
   },
   ios: {
-    // 讓 WebView 自動處理 safe-area inset，內容不被瀏海/home bar 蓋住。
-    contentInset: 'always',
-    // 關閉 WKWebView 外層 UIScrollView 的捲動 → 原生橡皮筋回彈徹底消失，
-    // 不會再露出下面那行 backgroundColor 的淡藍色（回彈時露出的就是它）。
+    // safe area 一律交給 CSS 處理（index.html 有 viewport-fit=cover，全站 13 個
+    // 檔案用 env(safe-area-inset-*)，含 app.tsx 的 header/nav/main 與登入、
+    // onboarding、隱私權等頁）。
     //
-    // ⚠️ 這一行「依賴前端」：App 的捲動已改由 .app-frame 容器負責（見 src/index.css
-    //    的 html.native-app 區塊與 src/lib/scrollContainer.ts）。若線上版沒有那段
-    //    CSS，這個 App 會完全無法捲動。
-    //    → 打包送審前，務必先確認 Vercel 線上版已含該段 CSS。
-    //
-    // 備註：不必另外設 scrollView.bounces = false，Capacitor 預設就已經是 false
-    //    （CAPBridgeViewController.prepareWebView），而且實測光靠它擋不住這個回彈。
-    scrollEnabled: false,
+    // 為什麼不能用 'always'（原本的設定）：它會讓原生 UIScrollView 把網頁內容
+    //   往內縮 safe area 的高度，畫面上下各留一條，露出的正是下面那行
+    //   backgroundColor 的 #F0F6FF 淡藍（Capacitor 會把它同時設到
+    //   webView.backgroundColor 與 scrollView.backgroundColor）。
+    //   這才是「滑到最上/最下出現淡藍空白」的真正原因——不是橡皮筋回彈，
+    //   Capacitor 在 CAPBridgeViewController.prepareWebView 預設就已經
+    //   bounces = false 了。內容比可視區高時捲動會蓋住那兩條，所以只有捲到
+    //   極端才看得到。
+    //   再加上 CSS 本來就有 env(safe-area-inset-*)，'always' 等於把 safe area
+    //   算了兩次。
+    contentInset: 'never',
     // 背景色：載入遠端網站前的底色，與啟動畫面品牌淺藍一致避免閃白。
     backgroundColor: '#F0F6FF',
   },
