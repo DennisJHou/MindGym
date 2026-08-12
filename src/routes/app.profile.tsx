@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { track } from '../lib/analytics'
 import { streakFromDates } from '../lib/streak'
 import { checkAndGenerateReviews, mondayOf } from '../lib/reviews'
 import { fetchWeeklyCounts, type WeeklyCounts } from '../lib/weeklyReview'
@@ -1371,8 +1372,31 @@ function ProfilePage() {
   const [editingName, setEditingName] = useState(false)
   const [savingName, setSavingName] = useState(false)
   const [showPermaInfoModal, setShowPermaInfoModal] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const totalMinutes = totalCount * 5
   const practiceTime = formatPracticeTime(totalMinutes, t)
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.navigate({ to: '/login' })
+  }
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true)
+    setDeleteError(null)
+    const { error } = await supabase.functions.invoke('delete-account')
+    if (error) {
+      console.error('[delete account]', error)
+      setDeleting(false)
+      setDeleteError(t('刪除失敗，請稍後再試。'))
+      return
+    }
+    track('account_deleted')
+    await supabase.auth.signOut()
+    router.navigate({ to: '/login' })
+  }
 
   // lazy 檢查是否有新的回顧報告可生成（每人每天最多一次，見 reviews.ts）。
   useEffect(() => {
@@ -1584,6 +1608,24 @@ function ProfilePage() {
           </Link>
         </div>
 
+        {/* 帳號設定 */}
+        <div className="rounded-3xl bg-card p-5 shadow-soft">
+          <h2 className="mb-3 text-lg font-extrabold text-foreground">{t('帳號設定')}</h2>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => void handleLogout()}
+              className="flex h-12 w-full items-center justify-center rounded-2xl bg-muted text-sm font-bold text-foreground transition active:scale-[0.98]"
+            >
+              {t('登出')}
+            </button>
+            <button
+              onClick={() => { setDeleteError(null); setShowDeleteConfirm(true) }}
+              className="flex h-12 w-full items-center justify-center rounded-2xl text-sm font-bold text-red-500 transition active:scale-[0.98]"
+            >
+              {t('刪除帳號')}
+            </button>
+          </div>
+        </div>
         </div>
       </div>
 
@@ -1594,6 +1636,43 @@ function ProfilePage() {
           onSelect={handleSelectAvatar}
           onClose={() => setShowPicker(false)}
         />
+      )}
+
+      {/* 刪除帳號確認 modal */}
+      {showDeleteConfirm && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-[#1c1714]/40 px-6"
+          onClick={() => !deleting && setShowDeleteConfirm(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-[24px] bg-background p-6 shadow-soft"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-black text-foreground">{t('刪除帳號')}</h2>
+            <p className="mt-2 text-[15px] leading-relaxed text-foreground/80">
+              {t('確定要刪除帳號嗎？此操作無法復原，所有紀錄將永久刪除。')}
+            </p>
+            {deleteError && (
+              <p className="mt-2 text-xs font-semibold text-red-500">{deleteError}</p>
+            )}
+            <div className="mt-5 flex flex-col gap-2">
+              <button
+                onClick={() => void handleDeleteAccount()}
+                disabled={deleting}
+                className="w-full rounded-full bg-red-500 py-3 text-base font-extrabold text-white shadow-soft transition active:scale-[0.98] disabled:opacity-60"
+              >
+                {deleting ? t('刪除中…') : t('確定刪除')}
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="w-full rounded-full py-2.5 text-sm font-bold text-muted-foreground"
+              >
+                {t('取消')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )
