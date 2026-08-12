@@ -9,6 +9,7 @@ import {
   type InAppBrowser,
 } from '../lib/inAppBrowser'
 import { isNativeApp, signInWithGoogleNative } from '../lib/nativeAuth'
+import { signInWithAppleNative } from '../lib/appleAuth'
 import coachWelcome from '../assets/ui/gratitude-mascot.png'
 import { useLanguage } from '../lib/i18n/context'
 import { LanguageSwitcherCompact } from '../components/LanguageSwitcher'
@@ -22,19 +23,19 @@ export const Route = createFileRoute('/login')({
   component: LoginPage,
 })
 
-// 暫時隱藏 Email 登入，待團隊討論後決定是否恢復
-const SHOW_EMAIL_LOGIN = false
-
-// 'idle' = 還沒送驗證碼，'code' = 已送出、等待輸入驗證碼
-type EmailStep = 'idle' | 'code'
+// 'login' = 帳號密碼登入，'signup' = 註冊新帳號
+type EmailMode = 'login' | 'signup'
 
 function LoginPage() {
   const { t } = useLanguage()
   const [email, setEmail] = useState('')
-  const [code, setCode] = useState('')
-  const [step, setStep] = useState<EmailStep>('idle')
+  const [password, setPassword] = useState('')
+  const [mode, setMode] = useState<EmailMode>('login')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // 註冊後若專案開啟「Confirm email」，signUp() 不會馬上給 session，
+  // 要提示使用者去信箱點驗證信連結，而不是讓畫面看起來卡住。
+  const [pendingConfirmation, setPendingConfirmation] = useState(false)
   // 從 LINE / FB / IG… App 內建瀏覽器打開時，Google 會擋下登入，
   // 這裡記錄是哪一種 App，好顯示對應的引導畫面（null = 不顯示）。
   const [inAppNotice, setInAppNotice] = useState<InAppBrowser>(null)
@@ -75,6 +76,19 @@ function LoginPage() {
     })
   }
 
+  // Sign in with Apple 只在原生 iOS App 裡顯示（見 src/lib/appleAuth.ts），
+  // 網頁版沒有這顆按鈕，故這裡不用像 handleGoogleLogin 一樣處理網頁版分支。
+  const handleAppleLogin = async () => {
+    try {
+      track('login_started', { method: 'apple', platform: 'native' })
+      await signInWithAppleNative()
+      track('login_completed', { method: 'apple' })
+    } catch (err) {
+      track('login_error', { method: 'apple', platform: 'native' })
+      console.error('[login] native apple login failed', err)
+    }
+  }
+
   const handleCopyUrl = async () => {
     try {
       await navigator.clipboard.writeText(getShareableUrl())
@@ -85,40 +99,58 @@ function LoginPage() {
     }
   }
 
-  const handleSendCode = async () => {
-    const trimmed = email.trim()
-    if (!trimmed) return
+  const handleSubmitPassword = async () => {
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail || !password) return
     setLoading(true)
     setError(null)
-    const { error } = await supabase.auth.signInWithOtp({
-      email: trimmed,
-      options: { shouldCreateUser: true },
-    })
+    track('login_started', { method: 'password', mode })
+
+    if (mode === 'login') {
+      const { error } = await supabase.auth.signInWithPassword({ email: trimmedEmail, password })
+      setLoading(false)
+      if (error) {
+        track('login_error', { method: 'password', mode })
+        setError(t('Email 或密碼錯誤，請再試一次。'))
+        return
+      }
+      track('login_completed', { method: 'password' })
+      // 成功後 onAuthStateChange 會更新 session，beforeLoad 自動導向 /app/home
+      return
+    }
+
+    // mode === 'signup'
+    const { data, error } = await supabase.auth.signUp({ email: trimmedEmail, password })
+    setLoading(false)
+    if (error) {
+      track('login_error', { method: 'password', mode })
+      setError(t('註冊失敗，請確認 email 格式或稍後再試。'))
+      return
+    }
+    if (data.session) {
+      // 專案未開啟「Confirm email」：註冊即登入，session 已建立。
+      track('login_completed', { method: 'password' })
+      return
+    }
+    // 開啟了「Confirm email」：還沒有 session，要先去信箱點驗證信。
+    setPendingConfirmation(true)
+  }
+
+  const handleForgotPassword = async () => {
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail) {
+      setError(t('請先輸入 email，才能寄送重設密碼信。'))
+      return
+    }
+    setLoading(true)
+    setError(null)
+    const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail)
     setLoading(false)
     if (error) {
       setError(t('寄送失敗，請確認 email 後再試一次。'))
       return
     }
-    setStep('code')
-  }
-
-  const handleVerifyCode = async () => {
-    const trimmedCode = code.trim()
-    if (!trimmedCode) return
-    setLoading(true)
-    setError(null)
-    const { error } = await supabase.auth.verifyOtp({
-      email: email.trim(),
-      token: trimmedCode,
-      type: 'email',
-    })
-    setLoading(false)
-    if (error) {
-      setError(t('驗證碼錯誤或已過期，請重新輸入。'))
-      return
-    }
-    track('login_completed', { method: 'email' })
-    // 成功後 onAuthStateChange 會更新 session，beforeLoad 自動導向 /app/home
+    setError(t('已寄出重設密碼信，請至信箱查收。'))
   }
 
   return (
@@ -156,72 +188,91 @@ function LoginPage() {
       {/* 底部固定 CTA */}
       <div className="fixed inset-x-0 bottom-0 bg-gradient-to-t from-background via-background to-transparent px-6 pb-10 pt-10">
         <div className="mx-auto w-full max-w-sm space-y-3">
-          {SHOW_EMAIL_LOGIN && step === 'idle' && (
-            <input
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              placeholder={t('輸入 email')}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="h-14 w-full rounded-full bg-card px-6 text-center text-base font-semibold text-foreground shadow-soft outline-none placeholder:text-muted-foreground/60"
-            />
-          )}
-          {SHOW_EMAIL_LOGIN && step === 'code' && (
-            <input
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              placeholder={t('輸入 6 位數驗證碼')}
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-              className="h-14 w-full rounded-full bg-card px-6 text-center text-xl font-bold tracking-[0.4em] text-foreground shadow-soft outline-none placeholder:text-base placeholder:font-semibold placeholder:tracking-normal placeholder:text-muted-foreground/60"
-            />
-          )}
-
-          {SHOW_EMAIL_LOGIN && error && (
-            <p className="text-center text-xs font-semibold text-red-500">{error}</p>
-          )}
-
-          {SHOW_EMAIL_LOGIN && step === 'idle' && (
-            <button
-              onClick={handleSendCode}
-              disabled={loading || !email.trim()}
-              className="flex h-16 w-full items-center justify-center rounded-full bg-primary text-base font-extrabold tracking-wide text-primary-foreground shadow-soft transition active:scale-[0.98] disabled:opacity-50"
-            >
-              {loading ? t('寄送中…') : t('用 Email 登入')}
-            </button>
-          )}
-          {SHOW_EMAIL_LOGIN && step === 'code' && (
-            <>
-              <button
-                onClick={handleVerifyCode}
-                disabled={loading || code.trim().length < 6}
-                className="flex h-16 w-full items-center justify-center rounded-full bg-primary text-base font-extrabold tracking-wide text-primary-foreground shadow-soft transition active:scale-[0.98] disabled:opacity-50"
-              >
-                {loading ? t('驗證中…') : t('確認驗證碼')}
-              </button>
+          {pendingConfirmation ? (
+            <div className="rounded-3xl bg-card px-6 py-5 text-center shadow-soft">
+              <p className="text-sm font-semibold text-foreground">
+                {t('請至信箱查收驗證信，完成後即可登入。')}
+              </p>
               <button
                 onClick={() => {
-                  setStep('idle')
-                  setCode('')
-                  setError(null)
+                  setPendingConfirmation(false)
+                  setMode('login')
                 }}
-                className="w-full text-center text-xs font-semibold text-muted-foreground underline"
+                className="mt-3 text-xs font-semibold text-muted-foreground underline"
               >
-                {t('重新輸入 email')}
+                {t('已有帳號？前往登入')}
               </button>
+            </div>
+          ) : (
+            <>
+              <input
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                placeholder={t('輸入 email')}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="h-14 w-full rounded-full bg-card px-6 text-center text-base font-semibold text-foreground shadow-soft outline-none placeholder:text-muted-foreground/60"
+              />
+              <input
+                type="password"
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                placeholder={t('輸入密碼')}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="h-14 w-full rounded-full bg-card px-6 text-center text-base font-semibold text-foreground shadow-soft outline-none placeholder:text-muted-foreground/60"
+              />
+
+              {error && (
+                <p className="text-center text-xs font-semibold text-red-500">{error}</p>
+              )}
+
+              <button
+                onClick={handleSubmitPassword}
+                disabled={loading || !email.trim() || !password}
+                className="flex h-16 w-full items-center justify-center rounded-full bg-primary text-base font-extrabold tracking-wide text-primary-foreground shadow-soft transition active:scale-[0.98] disabled:opacity-50"
+              >
+                {loading
+                  ? mode === 'login' ? t('登入中…') : t('建立帳號中…')
+                  : mode === 'login' ? t('登入') : t('註冊')}
+              </button>
+
+              <div className="flex items-center justify-between px-2">
+                <button
+                  onClick={() => {
+                    setMode(mode === 'login' ? 'signup' : 'login')
+                    setError(null)
+                  }}
+                  className="text-xs font-semibold text-muted-foreground underline"
+                >
+                  {mode === 'login' ? t('還沒有帳號？註冊新帳號') : t('已有帳號？前往登入')}
+                </button>
+                {mode === 'login' && (
+                  <button
+                    onClick={handleForgotPassword}
+                    className="text-xs font-semibold text-muted-foreground underline"
+                  >
+                    {t('忘記密碼？')}
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 py-1">
+                <span className="h-px flex-1 bg-muted-foreground/20" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('或')}</span>
+                <span className="h-px flex-1 bg-muted-foreground/20" />
+              </div>
             </>
           )}
 
-          {/* 分隔線只在 email 登入顯示時才需要 */}
-          {SHOW_EMAIL_LOGIN && step === 'idle' && (
-            <div className="flex items-center gap-3 py-1">
-              <span className="h-px flex-1 bg-muted-foreground/20" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('或')}</span>
-              <span className="h-px flex-1 bg-muted-foreground/20" />
-            </div>
+          {isNativeApp() && (
+            <button
+              onClick={handleAppleLogin}
+              className="flex h-16 w-full items-center justify-center gap-3 rounded-full bg-black text-base font-extrabold tracking-wide text-white shadow-soft transition active:scale-[0.98]"
+            >
+              <AppleIcon />
+              {t('用 Apple 登入')}
+            </button>
           )}
 
           <button
@@ -325,6 +376,15 @@ function GoogleIcon() {
       <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
       <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
       <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+    </svg>
+  )
+}
+
+// Apple 官方標誌，依 Human Interface Guidelines 要求 Sign in with Apple 按鈕須用此圖示。
+function AppleIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M16.365 1.43c0 1.14-.462 2.11-1.212 2.86-.82.82-2.06 1.45-3.09 1.36-.14-1.1.44-2.24 1.19-2.96.83-.82 2.24-1.4 3.11-1.26zM20.35 17.4c-.55 1.25-.81 1.81-1.51 2.91-.98 1.53-2.36 3.44-4.07 3.46-1.51.02-1.9-.98-3.94-.97-2.04.01-2.47.99-3.98.97-1.71-.02-3.02-1.74-4-3.27-2.74-4.22-3.03-9.17-1.34-11.81 1.2-1.87 3.09-2.96 4.87-2.96 1.81 0 2.95 1 4.45 1 1.45 0 2.34-1 4.44-1 1.58 0 3.26.86 4.45 2.35-3.91 2.14-3.28 7.73.63 9.32z" />
     </svg>
   )
 }
