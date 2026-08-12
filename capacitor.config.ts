@@ -22,8 +22,21 @@ const config: CapacitorConfig = {
     cleartext: false,
   },
   ios: {
-    // 讓 WebView 自動處理 safe-area inset，內容不被瀏海/home bar 蓋住。
-    contentInset: 'always',
+    // safe area 一律交給 CSS 處理（index.html 有 viewport-fit=cover，全站 13 個
+    // 檔案用 env(safe-area-inset-*)，含 app.tsx 的 header/nav/main 與登入、
+    // onboarding、隱私權等頁）。
+    //
+    // 為什麼不能用 'always'（原本的設定）：它會讓原生 UIScrollView 把網頁內容
+    //   往內縮 safe area 的高度，畫面上下各留一條，露出的正是下面那行
+    //   backgroundColor 的 #F0F6FF 淡藍（Capacitor 會把它同時設到
+    //   webView.backgroundColor 與 scrollView.backgroundColor）。
+    //   這才是「滑到最上/最下出現淡藍空白」的真正原因——不是橡皮筋回彈，
+    //   Capacitor 在 CAPBridgeViewController.prepareWebView 預設就已經
+    //   bounces = false 了。內容比可視區高時捲動會蓋住那兩條，所以只有捲到
+    //   極端才看得到。
+    //   再加上 CSS 本來就有 env(safe-area-inset-*)，'always' 等於把 safe area
+    //   算了兩次。
+    contentInset: 'never',
     // 背景色：載入遠端網站前的底色，與啟動畫面品牌淺藍一致避免閃白。
     backgroundColor: '#F0F6FF',
   },

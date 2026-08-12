@@ -5,7 +5,6 @@ import { track } from '../lib/analytics'
 import { streakFromDates } from '../lib/streak'
 import { checkAndGenerateReviews, mondayOf } from '../lib/reviews'
 import { fetchWeeklyCounts, type WeeklyCounts } from '../lib/weeklyReview'
-import { type TargetCode, TARGET_META, TARGET_COLORS, TARGET_INSIGHT, TARGET_INFO } from '../lib/gratitudeTargets'
 import { isoLocalDate } from '../lib/date'
 import avatar1 from '../assets/ui/avatar-1.png'
 import avatar2 from '../assets/ui/avatar-2.png'
@@ -591,173 +590,6 @@ function LoadingState() {
         <div className="h-72 animate-pulse rounded-3xl bg-primary-soft" />
       </div>
     </div>
-  )
-}
-
-// ── 感恩對象地圖 ────────────────────────────────────────────────────────────
-
-function DonutChart({ segments }: { segments: { code: TargetCode; count: number; pct: number }[] }) {
-  const r = 37
-  const cx = 50
-  const cy = 50
-  const circumference = 2 * Math.PI * r
-  // 單一區塊時不留缺口（否則圓形會被切一刀）；多區塊用圓角端 + 缺口呈現附圖五的塊狀甜甜圈。
-  const gapPx = segments.length > 1 ? 9 : 0
-
-  if (segments.length === 0) {
-    return (
-      <svg viewBox="0 0 100 100" className="h-36 w-36">
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#efe7d6" strokeWidth="17" />
-      </svg>
-    )
-  }
-
-  let cumulative = 0
-  return (
-    <svg viewBox="0 0 100 100" className="h-36 w-36 -rotate-90">
-      {segments.map(({ code, pct }) => {
-        const dash = Math.max(0.5, pct * circumference - gapPx)
-        const gap = circumference - dash
-        const offset = -(cumulative * circumference)
-        cumulative += pct
-        return (
-          <circle
-            key={code}
-            cx={cx}
-            cy={cy}
-            r={r}
-            fill="none"
-            stroke={TARGET_COLORS[code]}
-            strokeWidth="17"
-            strokeLinecap="round"
-            strokeDasharray={`${dash} ${gap}`}
-            strokeDashoffset={offset}
-          />
-        )
-      })}
-    </svg>
-  )
-}
-
-function GratitudeTargetMap({ userId }: { userId: string | null }) {
-  const { t } = useLanguage()
-  const [segments, setSegments] = useState<{ code: TargetCode; count: number; pct: number }[]>([])
-  const [showInfoModal, setShowInfoModal] = useState(false)
-
-  useEffect(() => {
-    if (!userId) return
-    let cancelled = false
-    ;(async () => {
-      const { data } = await supabase
-        .from('gratitude_entries')
-        .select('target_1, target_2, target_3')
-        .eq('user_id', userId)
-        .eq('practice_type', 'gratitude')
-      if (cancelled || !data) return
-
-      const counts: Partial<Record<TargetCode, number>> = {}
-      for (const row of data) {
-        for (const val of [row.target_1, row.target_2, row.target_3]) {
-          if (val) counts[val as TargetCode] = (counts[val as TargetCode] ?? 0) + 1
-        }
-      }
-      const total = Object.values(counts).reduce((s, v) => s + v, 0)
-      if (total > 0) {
-        const segs = (Object.entries(counts) as [TargetCode, number][])
-          .sort((a, b) => b[1] - a[1])
-          .map(([code, count]) => ({ code, count, pct: count / total }))
-        setSegments(segs)
-      }
-    })()
-    return () => { cancelled = true }
-  }, [userId])
-
-  const topCode = segments[0]?.code ?? null
-  const insight = topCode ? TARGET_INSIGHT[topCode] : null
-
-  return (
-    <>
-      <div className="rounded-3xl bg-card p-5 shadow-soft">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-extrabold text-foreground">{t('感恩對象地圖')}</h2>
-          </div>
-          <button
-            onClick={() => setShowInfoModal(true)}
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-border text-xs font-bold text-muted-foreground transition hover:border-primary hover:text-primary"
-          >
-            ?
-          </button>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <div className="shrink-0">
-            <DonutChart segments={segments} />
-          </div>
-          <div className="flex flex-1 flex-col gap-2.5">
-            {segments.length === 0 ? (
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                {t('完成更多感恩練習後，這裡會顯示你的感恩對象分佈。')}
-              </p>
-            ) : (
-              segments.map(({ code, pct }) => {
-                const meta = TARGET_META[code]
-                return (
-                  <div key={code} className="flex items-center gap-2.5">
-                    <span
-                      className="h-3 w-3 shrink-0 rounded-full"
-                      style={{ background: TARGET_COLORS[code] }}
-                    />
-                    <span className="flex-1 text-sm font-bold text-foreground">
-                      {t(meta.label)}
-                    </span>
-                    <span className="text-sm font-extrabold text-foreground">
-                      {Math.round(pct * 100)}%
-                    </span>
-                  </div>
-                )
-              })
-            )}
-          </div>
-        </div>
-
-        {insight && (
-          <p className="mt-3 border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
-            {t(insight)}
-          </p>
-        )}
-      </div>
-
-      {showInfoModal && (
-        <div
-          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
-          onClick={() => setShowInfoModal(false)}
-        >
-          <div
-            className="w-full max-w-md rounded-3xl bg-card p-6 shadow-soft"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <p className="text-sm font-extrabold text-foreground">{t('感恩對象的心理學意義')}</p>
-              <button
-                onClick={() => setShowInfoModal(false)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="flex flex-col gap-4">
-              {(Object.entries(TARGET_INFO) as [TargetCode, { title: string; desc: string }][]).map(([, info]) => (
-                <div key={info.title}>
-                  <p className="text-xs font-extrabold text-foreground">{t(info.title)}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{t(info.desc)}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
   )
 }
 
@@ -1775,9 +1607,6 @@ function ProfilePage() {
             {t('重新評估')}
           </Link>
         </div>
-
-        {/* 感恩對象地圖 */}
-        <GratitudeTargetMap userId={userId} />
 
         {/* 帳號設定 */}
         <div className="rounded-3xl bg-card p-5 shadow-soft">

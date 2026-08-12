@@ -1,13 +1,11 @@
 // 一週回顧頁：健心日記卡片底部小框的入口頁。
-// 感恩／過程次數、感恩日記全文、感恩對象分佈、常提到的詞彙、這週收到的社群留言：
-// 全部前端直查既有資料表（target_1..3／tag_1..3 寫日記當下就由 AI 標好了，純統計不必再呼叫 AI）。
-// 只有「常見情緒」需要讀原文判斷，串接後端 /api/reviews/weekly-digest。
+// 日記次數、感恩日記全文、人生主題、情緒趨勢／文字雲與社群留言都在此彙整；
+// AI 週統整仍保留準確性、驚喜感、自我覺察、洞察與行動四段研究架構。
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { supabase } from '../lib/supabase'
-import { mondayOf, requestWeeklyDigest, isSunday, type GratitudeDepthLevel, type WeeklyDigestContent } from '../lib/reviews'
+import { mondayOf, requestWeeklyDigest, isSunday, type GratitudeDepthLevel, type LifeThemeKey, type WeeklyDigestContent } from '../lib/reviews'
 import { fetchWeeklyReviewData, type WeeklyReviewData } from '../lib/weeklyReview'
-import { TARGET_COLORS, TARGET_META } from '../lib/gratitudeTargets'
 import { downloadNodeAsPng } from '../lib/shareImage'
 import { useLanguage } from '../lib/i18n/context'
 import { track } from '../lib/analytics'
@@ -47,6 +45,184 @@ const NARRATIVE_META: { key: 'accuracy' | 'surprise' | 'awareness' | 'insight'; 
 function narrativeBullets(value: string[] | string | undefined): string[] {
   if (!value) return []
   return (Array.isArray(value) ? value : [value]).filter((s) => s && s.trim().length > 0)
+}
+
+const LIFE_THEME_META: Record<LifeThemeKey, { label: string; color: string }> = {
+  work: { label: '工作／學業', color: '#88B8CE' },
+  relationships: { label: '人際關係', color: '#C68597' },
+  health: { label: '身心健康', color: '#6F9875' },
+  rest: { label: '休息與恢復', color: '#C9A75D' },
+  growth: { label: '自我成長', color: '#9A82B2' },
+  other: { label: '生活日常', color: '#A69A8E' },
+}
+
+type TFn = (text: string, vars?: Record<string, string | number>) => string
+
+function LifeThemeDonut({ themes, t }: { themes: NonNullable<WeeklyDigestContent['themes']>; t: TFn }) {
+  const usable = themes.filter((theme) => theme.count > 0).sort((a, b) => b.count - a.count)
+  const total = usable.reduce((sum, theme) => sum + theme.count, 0)
+  if (total === 0) return null
+
+  const radius = 37
+  const circumference = 2 * Math.PI * radius
+  const gapPx = usable.length > 1 ? 9 : 0
+  let cumulative = 0
+
+  return (
+    <div className="flex items-center gap-4">
+      <div className="shrink-0">
+        <svg viewBox="0 0 100 100" className="h-36 w-36 -rotate-90" role="img" aria-label={t('人生主題分布')}>
+          {usable.map((theme) => {
+            const pct = theme.count / total
+            const dash = Math.max(0.5, pct * circumference - gapPx)
+            const gap = circumference - dash
+            const offset = -(cumulative * circumference)
+            cumulative += pct
+            return (
+              <circle
+                key={theme.key}
+                cx="50"
+                cy="50"
+                r={radius}
+                fill="none"
+                stroke={LIFE_THEME_META[theme.key].color}
+                strokeWidth="17"
+                strokeLinecap="round"
+                strokeDasharray={`${dash} ${gap}`}
+                strokeDashoffset={offset}
+              />
+            )
+          })}
+        </svg>
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+        {usable.map((theme) => (
+          <div key={theme.key} className="flex items-center gap-2.5">
+            <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: LIFE_THEME_META[theme.key].color }} />
+            <span className="min-w-0 flex-1 text-sm font-bold text-foreground">{t(LIFE_THEME_META[theme.key].label)}</span>
+            <span className="text-sm font-extrabold text-foreground">{Math.round((theme.count / total) * 100)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function EmotionTrendChart({ points, t }: { points: NonNullable<WeeklyDigestContent['emotion_trend']>; t: TFn }) {
+  const data = points
+    .map((point) => ({ ...point, score: Math.max(-100, Math.min(100, Number(point.score) || 0)) }))
+    .sort((a, b) => a.date.localeCompare(b.date))
+  if (data.length === 0) {
+    return <p className="text-sm text-muted-foreground">{t('再多寫幾篇，情緒趨勢就會出現')}</p>
+  }
+
+  const width = 360
+  const height = 180
+  const pad = { left: 38, right: 14, top: 20, bottom: 34 }
+  const innerWidth = width - pad.left - pad.right
+  const innerHeight = height - pad.top - pad.bottom
+  const x = (index: number) => data.length === 1 ? pad.left + innerWidth / 2 : pad.left + (index / (data.length - 1)) * innerWidth
+  const y = (score: number) => pad.top + ((100 - score) / 200) * innerHeight
+  const path = data.map((point, index) => `${index === 0 ? 'M' : 'L'} ${x(index)} ${y(point.score)}`).join(' ')
+
+  return (
+    <div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full" role="img" aria-label={t('本週情緒折線圖')}>
+        <rect x={pad.left} y={pad.top} width={innerWidth} height={innerHeight / 2} fill="#EDF5F0" />
+        <rect x={pad.left} y={pad.top + innerHeight / 2} width={innerWidth} height={innerHeight / 2} fill="#FAF0F2" />
+        <text
+          x={width - pad.right - 6}
+          y={pad.top + 13}
+          textAnchor="end"
+          fontSize="9"
+          fontWeight="700"
+          fill="#3F6B46"
+        >
+          {t('正向情緒')}
+        </text>
+        <text
+          x={width - pad.right - 6}
+          y={pad.top + innerHeight - 8}
+          textAnchor="end"
+          fontSize="9"
+          fontWeight="700"
+          fill="#A85A72"
+        >
+          {t('負面情緒')}
+        </text>
+        {[100, 0, -100].map((tick) => (
+          <g key={tick}>
+            <line x1={pad.left} x2={width - pad.right} y1={y(tick)} y2={y(tick)} stroke="#D9CEC2" strokeWidth={tick === 0 ? 1.5 : 1} />
+            <text x={pad.left - 7} y={y(tick) + 3} textAnchor="end" fontSize="9" fill="#876B5F">
+              {tick > 0 ? `+${tick}` : tick}
+            </text>
+          </g>
+        ))}
+        {data.length > 1 && <path d={path} fill="none" stroke="#6FA8C1" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
+        {data.map((point, index) => (
+          <g key={`${point.date}-${index}`}>
+            <circle cx={x(index)} cy={y(point.score)} r="5" fill="#FEFAF0" stroke="#6FA8C1" strokeWidth="3" />
+            <text
+              x={x(index) + (index === 0 ? 7 : index === data.length - 1 ? -7 : 0)}
+              y={point.score > 70 ? y(point.score) + 17 : y(point.score) - 10}
+              textAnchor={index === 0 ? 'start' : index === data.length - 1 ? 'end' : 'middle'}
+              fontSize="10"
+              fontWeight="700"
+              fill="#542916"
+            >
+              {point.score > 0 ? `+${point.score}` : point.score}
+            </text>
+            <text x={x(index)} y={height - 12} textAnchor="middle" fontSize="10" fontWeight="700" fill="#876B5F">
+              {point.date.slice(5).replace('-', '/')}
+            </text>
+          </g>
+        ))}
+      </svg>
+      <p className="mt-1 text-center text-[11px] leading-relaxed text-muted-foreground">
+        {t('依日記文字分析情緒效價，0 代表平穩，越高越正向。')}
+      </p>
+    </div>
+  )
+}
+
+function EmotionWordCloud({ emotions, t }: { emotions: WeeklyDigestContent['emotions']; t: TFn }) {
+  if (emotions.length === 0) {
+    return <p className="text-sm text-muted-foreground">{t('再多寫幾篇，情緒文字雲就會出現')}</p>
+  }
+  const maxCount = Math.max(...emotions.map((emotion) => Math.max(1, emotion.count)))
+  const colors = { positive: '#3F6B46', negative: '#A85A72', neutral: '#876B5F' }
+  const ordered = [...emotions].sort((a, b) => b.count - a.count)
+
+  return (
+    <div>
+      <div className="flex min-h-32 flex-wrap items-center justify-center gap-x-4 gap-y-2 rounded-2xl bg-[#FCF7EE] px-5 py-6">
+        {ordered.map((emotion, index) => {
+          const ratio = Math.max(1, emotion.count) / maxCount
+          const size = 15 + ratio * 18
+          const valence = emotion.valence ?? 'neutral'
+          return (
+            <span
+              key={emotion.label}
+              style={{
+                color: colors[valence],
+                fontSize: `${size}px`,
+                fontWeight: ratio > 0.6 ? 900 : 700,
+                opacity: 0.72 + ratio * 0.28,
+                transform: `translateY(${index % 3 === 1 ? -3 : index % 3 === 2 ? 3 : 0}px)`,
+              }}
+            >
+              {emotion.label}
+            </span>
+          )
+        })}
+      </div>
+      <div className="mt-2 flex justify-center gap-4 text-[11px] font-bold text-muted-foreground">
+        <span className="text-[#3F6B46]">{t('正向')}</span>
+        <span>{t('中性')}</span>
+        <span className="text-[#A85A72]">{t('負向')}</span>
+      </div>
+    </div>
+  )
 }
 
 type DigestState = 'loading' | 'ready' | 'unavailable'
@@ -144,7 +320,8 @@ function WeeklyReviewPage() {
       setData(d)
       setLoading(false)
 
-      if (d.gratitudeCount < 2) {
+      const diaryCount = d.gratitudeCount + d.processCount + d.selfCompassionCount + d.woopCount
+      if (diaryCount < 2) {
         setDigestState('unavailable')
         return
       }
@@ -181,6 +358,9 @@ function WeeklyReviewPage() {
   }
 
   const totalCount = (data?.gratitudeCount ?? 0) + (data?.processCount ?? 0) + (data?.selfCompassionCount ?? 0) + (data?.woopCount ?? 0)
+  const emotionTrendPoints = digest?.emotion_trend?.length ? digest.emotion_trend : (data?.fallbackEmotionTrend ?? [])
+  const lifeThemes = digest?.themes?.some((theme) => theme.count > 0) ? digest.themes : (data?.fallbackThemes ?? [])
+  const emotionWords = digest?.emotions?.length ? digest.emotions : (data?.fallbackEmotions ?? [])
   const visibleComments = expanded ? (data?.comments ?? []) : (data?.comments ?? []).slice(0, 2)
   const visibleEntries = entriesExpanded ? (data?.gratitudeEntries ?? []) : (data?.gratitudeEntries ?? []).slice(0, 2)
 
@@ -401,34 +581,40 @@ function WeeklyReviewPage() {
             </div>
           )}
 
-          {/* AI 週分析：對象／詞彙（前端統計）＋ 情緒（後端 AI） */}
+          {/* AI 週分析：彙整所有日記的人生主題、情緒趨勢與情緒詞雲。 */}
           <div className="rounded-3xl bg-card p-5 shadow-soft">
             <p className="mb-1 text-[10px] font-extrabold uppercase tracking-[0.25em] text-muted-foreground">
               AI Weekly Analysis
             </p>
             <h2 className="mb-3 text-lg font-extrabold text-foreground">{t('AI 週分析')}</h2>
 
-            {data!.targets.length > 0 && (
-              <div className="mb-4">
-                <p className="mb-1.5 text-xs font-bold text-muted-foreground">{t('最常感恩的對象')}</p>
-                <div className="flex h-3.5 overflow-hidden rounded-full bg-muted">
-                  {data!.targets.map((seg) => (
-                    <span
-                      key={seg.code}
-                      style={{ width: `${seg.pct * 100}%`, background: TARGET_COLORS[seg.code] }}
-                    />
-                  ))}
-                </div>
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                  {data!.targets.map((seg) => (
-                    <span key={seg.code} className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
-                      <span className="h-2 w-2 rounded-full" style={{ background: TARGET_COLORS[seg.code] }} />
-                      {t(TARGET_META[seg.code].label)} {Math.round(seg.pct * 100)}%
+            <div className="mb-5">
+              <p className="mb-1.5 text-xs font-bold text-muted-foreground">{t('情緒變化')}</p>
+              {digestState === 'loading' ? (
+                <div className="h-40 animate-pulse rounded-2xl bg-muted" />
+              ) : (
+                <EmotionTrendChart points={emotionTrendPoints} t={t} />
+              )}
+            </div>
+
+            <div className="mb-5">
+              <p className="mb-1.5 text-xs font-bold text-muted-foreground">{t('人生主題')}</p>
+              {digestState === 'loading' ? (
+                <div className="h-14 animate-pulse rounded-2xl bg-muted" />
+              ) : lifeThemes.some((theme) => theme.count > 0) ? (
+                <LifeThemeDonut themes={lifeThemes} t={t} />
+              ) : (digest?.keywords?.length ?? data!.keywords.length) > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {(digest?.keywords?.length ? digest.keywords : data!.keywords).slice(0, 8).map((theme) => (
+                    <span key={theme.label} className="rounded-full bg-tile-lemon px-3 py-1 text-xs font-bold text-foreground">
+                      {theme.label}{theme.count > 1 ? ` ×${theme.count}` : ''}
                     </span>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <p className="text-sm text-muted-foreground">{t('再多寫幾篇，人生主題分析就會出現')}</p>
+              )}
+            </div>
 
             {/* 感恩深度：Lin (2015) 四層次的件數分布（AI 逐件編碼） */}
             {(() => {
@@ -479,21 +665,15 @@ function WeeklyReviewPage() {
             })()}
 
             <div>
-              <p className="mb-1.5 text-xs font-bold text-muted-foreground">{t('常見情緒')}</p>
+              <p className="mb-1.5 text-xs font-bold text-muted-foreground">{t('情緒文字雲')}</p>
               {digestState === 'loading' ? (
-                <p className="text-sm text-muted-foreground">{t('AI 正在分析中…')}</p>
-              ) : digest && digest.emotions.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {digest.emotions.map((e) => (
-                    <span key={e.label} className="rounded-full bg-tile-pink px-3 py-1 text-xs font-bold text-foreground">
-                      {e.label}{e.count > 1 ? ` ×${e.count}` : ''}
-                    </span>
-                  ))}
-                </div>
+                <div className="h-32 animate-pulse rounded-2xl bg-muted" />
+              ) : emotionWords.length > 0 ? (
+                <EmotionWordCloud emotions={emotionWords} t={t} />
               ) : weekOffset === 0 && !isCurrentWeekSunday ? (
                 <p className="text-sm text-muted-foreground">{t('AI 情緒分析會在本週日整理後顯示')}</p>
               ) : (
-                <p className="text-sm text-muted-foreground">{t('再多寫幾篇，AI 情緒分析就會出現')}</p>
+                <EmotionWordCloud emotions={[]} t={t} />
               )}
             </div>
           </div>
@@ -572,7 +752,12 @@ function ShareCard({
   const depth = digest?.depth ?? []
   const depthTotal = depth.reduce((s, d) => s + d.count, 0)
   const keywords = (digest?.keywords?.length ? digest.keywords : data.keywords).slice(0, 6)
-  const emotions = (digest?.emotions ?? []).slice(0, 4)
+  const emotions = (digest?.emotions?.length ? digest.emotions : data.fallbackEmotions).slice(0, 4)
+  const shareThemes = digest?.themes?.some((theme) => theme.count > 0) ? digest.themes : data.fallbackThemes
+  const lifeThemes = shareThemes.filter((theme) => theme.count > 0).map((theme) => ({
+    label: t(LIFE_THEME_META[theme.key].label),
+    count: theme.count,
+  }))
 
   const sectionLabel = (text: string) => (
     <p style={{ fontSize: 28, fontWeight: 800, color: SHARE_MUTED, margin: '0 0 16px' }}>{text}</p>
@@ -644,22 +829,10 @@ function ShareCard({
 
       {/* AI 週分析（自然高度，不用 flex:1 撐滿固定畫布——畫布本身已改為隨內容自動撐高） */}
       <div style={{ background: '#fff', borderRadius: 36, padding: 44, marginTop: 32 }}>
-        {data.targets.length > 0 && (
+        {lifeThemes.length > 0 && (
           <div style={{ marginBottom: 40 }}>
-            {sectionLabel(t('最常感恩的對象'))}
-            <div style={{ display: 'flex', height: 30, borderRadius: 999, overflow: 'hidden', background: '#f1e8d8' }}>
-              {data.targets.map((seg) => (
-                <span key={seg.code} style={{ width: `${seg.pct * 100}%`, background: TARGET_COLORS[seg.code] }} />
-              ))}
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 30px', marginTop: 18 }}>
-              {data.targets.map((seg) => (
-                <span key={seg.code} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 26, fontWeight: 800, color: SHARE_MUTED, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  <span style={{ width: 16, height: 16, borderRadius: 999, background: TARGET_COLORS[seg.code], flexShrink: 0 }} />
-                  {t(TARGET_META[seg.code].label)} {Math.round(seg.pct * 100)}%
-                </span>
-              ))}
-            </div>
+            {sectionLabel(t('人生主題'))}
+            {chips(lifeThemes, '#e5eee7')}
           </div>
         )}
 
@@ -698,7 +871,7 @@ function ShareCard({
 
         {emotions.length > 0 && (
           <div>
-            {sectionLabel(t('常見情緒'))}
+            {sectionLabel(t('情緒文字雲'))}
             {chips(emotions, '#f3d9df')}
           </div>
         )}
