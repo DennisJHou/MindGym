@@ -104,7 +104,11 @@ function App() {
   return (
     <>
       <RouterProvider router={router} context={{ session }} />
-      <NotificationConsent />
+      {/* 只在登入後才詢問通知權限：登入頁還沒有貼文可被按讚、也沒有打卡可提醒，
+          提早問沒有意義；且橫幅固定在畫面底部，會蓋住登入頁下方的
+          Sign in with Apple／Google 按鈕（App Store 4.8 退件風險）。
+          未登入者仍可事後從選單的「🔔 通知」開關開啟。 */}
+      {session && <NotificationConsent />}
     </>
   )
 }
