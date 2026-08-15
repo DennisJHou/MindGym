@@ -154,7 +154,7 @@ function LoginPage() {
   }
 
   return (
-    <div className="relative flex h-screen flex-col items-center justify-end overflow-hidden px-6 pb-[200px]">
+    <div className="relative flex min-h-screen flex-col items-center justify-end overflow-x-hidden px-6 pt-12">
       <LanguageSwitcherCompact className="fixed top-[calc(env(safe-area-inset-top)+1rem)] right-4 z-20" />
       {inAppNotice && (
         <InAppBrowserNotice
@@ -185,8 +185,9 @@ function LoginPage() {
         <img src={coachWelcome} alt={t('PSY by PSY 教練')} className="relative h-52 w-auto drop-shadow-sm" />
       </div>
 
-      {/* 底部固定 CTA */}
-      <div className="fixed inset-x-0 bottom-0 bg-gradient-to-t from-background via-background to-transparent px-6 pb-10 pt-10">
+      {/* 底部 CTA：走正常排版流，不用 fixed —— 否則面板高度一變（例如加回帳密欄位、
+          多一顆 Apple 按鈕）就得同步改上面的預留 padding，改漏就會蓋住插圖與文案。 */}
+      <div className="w-full pb-10 pt-8">
         <div className="mx-auto w-full max-w-sm space-y-3">
           {pendingConfirmation ? (
             <div className="rounded-3xl bg-card px-6 py-5 text-center shadow-soft">
