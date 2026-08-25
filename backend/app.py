@@ -1765,18 +1765,29 @@ async def reviews_gratitude_weekly(req: GratitudeWeeklyRequest, authorization: s
 #   敘事回饋依該研究質性分析歸納的四大主題遞進
 #   （準確性 78.4% → 驚喜感 40.1% → 自我覺察 47.0% → 洞察 37.2%）鋪陳。
 _WEEKLY_DIGEST_SYSTEM = (
-    "你是心理健康 App 的感恩日記週統整分析師，語氣溫暖、具體、不批判、不做診斷，"
+    "你是心理健康 App 的週統整分析師，語氣溫暖、具體、不批判、不做診斷，"
     "用繁體中文、以「你」稱呼使用者，不使用 emoji 與 markdown 符號。\n"
-    "請閱讀使用者一週的感恩日記（逐件列出，每篇最多三件），產出兩部分：\n\n"
-    "A. 量化編碼（以「件」為單位逐件分類）：\n"
-    "1. emotions：最常出現的情緒（2-4 種，例如：平靜、感動、有成就感），與大約出現件數。\n"
-    "2. keywords：最常提到的具體詞彙（2-6 個，2-4 字名詞，例如：夥伴、晚餐），與出現次數。\n"
-    "3. depth：感恩深度四層次的件數分布（四層 count 加總＝總件數）：\n"
+    "請閱讀使用者一週內所有類型的日記（感恩、過程目標、自我慈悲、WOOP 等），產出兩部分：\n\n"
+    "A. 量化編碼：\n"
+    "1. emotions：最常出現的情緒（3-8 種，例如：平靜、感動、焦慮、有成就感），"
+    "每個情緒回傳 label、約略出現次數 count，以及 valence（positive／negative／neutral）。\n"
+    "2. emotion_trend：按日期彙整當天所有日記的整體情緒效價，score 為 -100 至 +100，"
+    "0 代表平穩中性；只回傳有日記的日期，並用 label 寫當天最主要的情緒。"
+    "評分要看情緒強度、正負訊號並存與具體語氣，不可因為感恩日記出現「感謝」就給 +100。"
+    "一般輕度正向約 +10～+30，明確愉悅／成就約 +35～+60，強烈正向才可超過 +70；"
+    "負向同理使用負分。±90 以上只保留給文字中非常強烈、單一且毫無矛盾的極端情緒。"
+    "相鄰日期若文字內容不同，分數也應反映合理差異。\n"
+    "3. themes：把所有日記的生活關注內容歸入固定六類，回傳 key、繁中 label、語意單位數 count："
+    "work（工作／學業）、relationships（人際關係）、health（身心健康）、"
+    "rest（休息與恢復）、growth（自我成長）、other（生活日常）。不要只分析感恩對象。\n"
+    "4. keywords：最常提到的具體詞彙（2-6 個，2-4 字名詞），與出現次數。\n"
+    "5. depth：只針對標記為「感恩日記」的內容，回傳感恩深度四層次的件數分布"
+    "（四層 count 加總＝感恩項目總件數；若沒有感恩日記則四層皆為 0）：\n"
     "   - recognize（認知到善意）：單純記錄一件好事，沒有情緒展開\n"
     "   - feel（感受到感激）：內化出情緒反應，有情緒詞（溫馨、感動、成就感等）\n"
     "   - express（表達感謝與反思）：有明確道謝的對象，或延伸出反思\n"
     "   - reciprocate（回報善意）：描述了主動回饋對方的行動\n\n"
-    "B. narrative：四個向度的統整回饋。每個向度回傳 2-3 條「條列短句」（每條 15-35 字，"
+    "B. narrative：根據所有日記產生四個向度的統整回饋。每個向度回傳 2-3 條「條列短句」（每條 15-35 字，"
     "整個向度加總不超過 100 字）。精確、直指重點、不堆冗詞，不要大量引用原文，"
     "只在必要時點出關鍵字。依序遞進：\n"
     "1. accuracy（準確性）：講中使用者真實的生活樣貌、自我概念與習慣——"
@@ -1789,13 +1800,34 @@ _WEEKLY_DIGEST_SYSTEM = (
     "只回傳 JSON，不要任何前言或 markdown。"
 )
 
+_LIFE_THEME_KEYS = {"work", "relationships", "health", "rest", "growth", "other"}
+_PRACTICE_LABELS = {
+    "gratitude": "感恩日記",
+    "process_goal": "過程目標覺察",
+    "self_compassion": "自我慈悲",
+    "woop": "WOOP 目標實踐",
+}
+
+
+def _weekly_score(value: object) -> int:
+    try:
+        return max(-100, min(100, int(round(float(value)))))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _weekly_count(value: object, minimum: int = 0) -> int:
+    try:
+        return max(minimum, int(round(float(value))))
+    except (TypeError, ValueError):
+        return minimum
+
 
 @app.post("/api/reviews/weekly-digest")
 async def reviews_weekly_digest(req: WeeklyDigestRequest, authorization: str = Header(...)):
-    """一週回顧頁的 AI 週統整分析：每週日生成一次，之後不重複生成。
-    如果該週已有分析，直接返回快取。
-    如果該週沒有分析且不是周日，返回 409（等待周日生成）。
-    該週 gratitude_entries ≥ 2 筆才生成。"""
+    """一週回顧頁的 AI 週統整分析：涵蓋所有內建日記，每週日生成一次。
+    已完成的 v4 分析直接讀快取；舊週的 v3 感恩限定分析會在開啟時升級。
+    當週尚未到周日則沿用既有快取，沒有快取時回 409。"""
     token = authorization.removeprefix("Bearer ").strip()
     user_id = await get_user_id(token)
 
@@ -1810,10 +1842,9 @@ async def reviews_weekly_digest(req: WeeklyDigestRequest, authorization: str = H
         headers=SUPABASE_HEADERS,
         params=[
             ("user_id", f"eq.{user_id}"),
-            ("practice_type", "eq.gratitude"),
             ("entry_date", f"gte.{start.isoformat()}"),
             ("entry_date", f"lte.{end.isoformat()}"),
-            ("select", "id,entry_date,item_1,item_2,item_3"),
+            ("select", "id,entry_date,practice_type,item_1,item_2,item_3"),
             ("order", "entry_date.asc"),
         ],
     )
@@ -1823,46 +1854,88 @@ async def reviews_weekly_digest(req: WeeklyDigestRequest, authorization: str = H
     entry_count = len(entries)
 
     existing = await _find_existing_review(user_id, None, "weekly_digest", start.isoformat())
-    if existing:
-        # 該週已有分析，直接返回（無論什麼時間）
+    existing_content = (existing or {}).get("content") or {}
+    if existing and int(existing_content.get("v") or 0) >= 4:
+        # 該週已有 v4 分析，直接返回（無論什麼時間）；仍需標記是否超額（規格 §3／§9）。
         return await _annotate_review_lock(user_id, existing)
 
-    # 該週沒有分析，只有在台灣時區的周日才生成新的
-    if not is_sunday_tw():
+    # 當週尚未到周日不重新分析；過去週允許把舊版感恩限定快取升級成全日記 v4。
+    today_tw = datetime.now(TW_TZ).date()
+    if not is_sunday_tw() and end >= today_tw:
+        if existing:
+            return await _annotate_review_lock(user_id, existing)
         raise HTTPException(status_code=409, detail="AI 分析將在本周日生成")
 
-    # 逐件列出（而非整篇合併），AI 才能以「件」為單位做深度編碼
+    # 每一件都保留日期與日記類型：情緒可按日彙整，感恩深度則只編碼感恩日記。
     lines = []
     for e in entries:
+        practice_type = str(e.get("practice_type") or "gratitude")
+        practice_label = _PRACTICE_LABELS.get(practice_type, "其他日記")
         for i, item in enumerate([e.get("item_1"), e.get("item_2"), e.get("item_3")], start=1):
             if item and item.strip():
-                lines.append(f"[{e['entry_date']}] {i}. {item.strip()}")
+                lines.append(f"[{e['entry_date']}][{practice_label}] {i}. {item.strip()}")
     joined = "\n".join(lines) or "（沒有文字內容）"
 
     ai_ok = False
-    emotions, keywords, depth, narrative = [], [], [], {}
+    emotions, emotion_trend, themes, keywords, depth, narrative = [], [], [], [], [], {}
     try:
         data = await _pg_claude_json(
             "weekly-digest", user_id, _WEEKLY_DIGEST_SYSTEM,
-            f"以下是使用者本週（{start.isoformat()} ~ {end.isoformat()}）的感恩日記，共 {len(lines)} 件：\n{joined}\n\n"
+            f"以下是使用者本週（{start.isoformat()} ~ {end.isoformat()}）的所有日記，共 {len(lines)} 個文字項目：\n{joined}\n\n"
             "只回傳 JSON："
-            '{"emotions":[{"label":"平靜","count":3}],'
+            '{"emotions":[{"label":"平靜","count":3,"valence":"positive"}],'
+            '"emotion_trend":[{"date":"YYYY-MM-DD","score":35,"label":"踏實"}],'
+            '"themes":[{"key":"relationships","label":"人際關係","count":5}],'
             '"keywords":[{"label":"夥伴","count":5}],'
             '"depth":[{"level":"recognize","count":5},{"level":"feel","count":6},'
             '{"level":"express","count":10},{"level":"reciprocate","count":0}],'
             '"narrative":{"accuracy":["...","..."],"surprise":["...","..."],'
             '"awareness":["...","..."],"insight":["...","..."]}}',
-            max_tokens=1600, model=_REVIEW_MODEL,
+            max_tokens=1900, model=_REVIEW_MODEL,
         )
-        emotions = data.get("emotions") or []
+        for item in data.get("emotions") or []:
+            label = str(item.get("label") or "").strip()[:20]
+            if not label:
+                continue
+            valence = item.get("valence")
+            emotions.append({
+                "label": label,
+                "count": _weekly_count(item.get("count"), 1),
+                "valence": valence if valence in {"positive", "negative", "neutral"} else "neutral",
+            })
+        for item in data.get("emotion_trend") or []:
+            date_value = str(item.get("date") or "")[:10]
+            if start.isoformat() <= date_value <= end.isoformat():
+                emotion_trend.append({
+                    "date": date_value,
+                    "score": _weekly_score(item.get("score")),
+                    "label": str(item.get("label") or "").strip()[:20],
+                })
+        emotion_trend.sort(key=lambda item: item["date"])
+        for item in data.get("themes") or []:
+            key = str(item.get("key") or "")
+            if key in _LIFE_THEME_KEYS:
+                themes.append({
+                    "key": key,
+                    "label": str(item.get("label") or "").strip()[:20],
+                    "count": _weekly_count(item.get("count")),
+                })
         keywords = data.get("keywords") or []
         depth = data.get("depth") or []
         narrative = data.get("narrative") or {}
-        ai_ok = bool(emotions or (narrative or {}).get("accuracy"))
+        ai_ok = bool(emotions or emotion_trend or themes or (narrative or {}).get("accuracy"))
     except Exception as exc:
         logger.warning("weekly_digest AI failed [%s]: %s", type(exc).__name__, exc)
 
-    content_json = {"v": 3, "emotions": emotions, "keywords": keywords, "depth": depth, "narrative": narrative}
+    content_json = {
+        "v": 4,
+        "emotions": emotions,
+        "emotion_trend": emotion_trend,
+        "themes": themes,
+        "keywords": keywords,
+        "depth": depth,
+        "narrative": narrative,
+    }
 
     # AI 失敗時不落庫（避免快取住空結果），直接回傳讓前端顯示既有的前端統計
     if ai_ok:
@@ -1876,7 +1949,7 @@ async def reviews_weekly_digest(req: WeeklyDigestRequest, authorization: str = H
             )
             rows = resp.json() if resp.status_code == 200 else []
             if rows:
-                return rows[0]
+                return await _annotate_review_lock(user_id, rows[0])
             logger.warning("weekly_digest update failed: %s", resp.text)
         else:
             try:
