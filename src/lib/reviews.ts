@@ -30,6 +30,13 @@ export interface ReviewRow {
   content: ReviewContent
   created_at: string
   read_at: string | null
+  /**
+   * 超出 AI 週分析額度（免費每月 1 份、付費每週 1 份）時為 true。
+   * 報告本身還是有生成、內容完整——前端只顯示前 30% 並疊上軟性付費牆
+   * （規格 §3／§9 要求那必須是真實生成內容的局部，不能用佔位文字）。
+   * 由後端 backend/app.py 的 _annotate_review_lock() 標記，client 改不了。
+   */
+  locked?: boolean
 }
 
 /** 感恩深度四層次（Lin, 2015 階層模型），與後端 weekly-digest 的 depth.level 對應。 */
@@ -65,6 +72,13 @@ export interface WeeklyDigestRow {
   content: WeeklyDigestContent
   created_at: string
   read_at: string | null
+  /**
+   * 超出 AI 週分析額度（免費每月 1 份、付費每週 1 份）時為 true。
+   * 報告本身還是有生成、內容完整——前端只顯示前 30% 並疊上軟性付費牆
+   * （規格 §3／§9 要求那必須是真實生成內容的局部，不能用佔位文字）。
+   * 由後端 backend/app.py 的 _annotate_review_lock() 標記，client 改不了。
+   */
+  locked?: boolean
 }
 
 async function authHeaders(): Promise<Record<string, string> | null> {

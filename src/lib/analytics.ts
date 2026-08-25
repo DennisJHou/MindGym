@@ -75,6 +75,12 @@ export type AnalyticsEvent =
   | 'weekly_review_week_switched'    // 一週回顧頁切換週次
   | 'weekly_review_notif_enable_clicked' // 一週回顧頁點擊「開啟通知」提示
   | 'account_deleted'                    // 使用者在個人頁面刪除自己的帳號
+  | 'paywall_viewed'                     // 看到付費牆（含來源 onboarding／settings）
+  | 'paywall_plan_selected'              // 在付費牆切換選中的方案
+  | 'paywall_intent_recorded'            // 按下主 CTA，付費意願已寫入 paywall_intents
+  | 'paywall_dismissed'                  // 關閉付費牆或點「先自己逛逛」
+  | 'soft_paywall_shown'                 // 週分析額度用完，顯示軟性付費牆
+  | 'community_lock_shown'               // 社群未解鎖（未貢獻），顯示貢獻換觀看提示
 
 // 已就緒的 posthog 實例；尚未載入完成時為 null。
 let ph: PostHog | null = null

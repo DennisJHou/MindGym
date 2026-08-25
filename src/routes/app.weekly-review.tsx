@@ -2,7 +2,7 @@
 // 感恩／過程次數、感恩日記全文、感恩對象分佈、常提到的詞彙、這週收到的社群留言：
 // 全部前端直查既有資料表（target_1..3／tag_1..3 寫日記當下就由 AI 標好了，純統計不必再呼叫 AI）。
 // 只有「常見情緒」需要讀原文判斷，串接後端 /api/reviews/weekly-digest。
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { supabase } from '../lib/supabase'
 import { mondayOf, requestWeeklyDigest, isSunday, type GratitudeDepthLevel, type WeeklyDigestContent } from '../lib/reviews'
@@ -13,6 +13,7 @@ import { useLanguage } from '../lib/i18n/context'
 import { track } from '../lib/analytics'
 import { isNativeApp } from '../lib/nativeAuth'
 import { enableNotifications, getLocalNotifPermission, type NotifPermission } from '../lib/localNotifications'
+import { SoftPaywallSheet } from '../components/paywall/SoftPaywallSheet'
 
 // 這個提示只問一次：按過「稍後再說」就不再於本頁詢問（仍可在側邊欄「通知」開關開啟）。
 const WEEKLY_REVIEW_NOTIF_DISMISS_KEY = 'weekly_review_notif_prompt_dismissed_v1'
@@ -49,6 +50,27 @@ function narrativeBullets(value: string[] | string | undefined): string[] {
   return (Array.isArray(value) ? value : [value]).filter((s) => s && s.trim().length > 0)
 }
 
+/**
+ * 把週分析的敘事段落攤平成純文字，給軟性付費牆取前 30% 用。
+ * 規格 §9 要求那必須是「真實生成內容」，所以這裡組的是報告本身的文字，
+ * 不是另外寫的行銷文案。
+ */
+function digestToPlainText(
+  content: WeeklyDigestContent | null,
+  t: (s: string) => string,
+): string {
+  if (!content?.narrative) return ''
+  const parts: string[] = []
+  for (const { key, label } of NARRATIVE_META) {
+    const bullets = narrativeBullets(content.narrative[key])
+    if (bullets.length === 0) continue
+    parts.push(t(label))
+    for (const b of bullets) parts.push(`・${b}`)
+    parts.push('')
+  }
+  return parts.join('\n').trim()
+}
+
 type DigestState = 'loading' | 'ready' | 'unavailable'
 
 function WeeklyReviewPage() {
@@ -61,6 +83,10 @@ function WeeklyReviewPage() {
   const [entriesExpanded, setEntriesExpanded] = useState(false)
   const [digest, setDigest] = useState<WeeklyDigestContent | null>(null)
   const [digestState, setDigestState] = useState<DigestState>('loading')
+  // 這份報告是否超出額度（後端標記）。true 時只顯示前 30% + 軟性付費牆。
+  const [digestLocked, setDigestLocked] = useState(false)
+  const [showSoftPaywall, setShowSoftPaywall] = useState(false)
+  const navigate = useNavigate()
   const [sharing, setSharing] = useState(false)
   const [isCurrentWeekSunday, setIsCurrentWeekSunday] = useState(false)
   const [nextSundayDate, setNextSundayDate] = useState<string>('')
@@ -121,6 +147,8 @@ function WeeklyReviewPage() {
     setEntriesExpanded(false)
     setDigest(null)
     setDigestState('loading')
+    setDigestLocked(false)
+    setShowSoftPaywall(false)
 
     const now = new Date()
     const monday = mondayOf(now)
@@ -152,6 +180,8 @@ function WeeklyReviewPage() {
         if (cancelled) return
         if (row) {
           setDigest(row.content)
+          // 超出額度時後端會標 locked：報告有生成，但只給看前 30%（規格 §3）。
+          setDigestLocked(row.locked === true)
           setDigestState('ready')
         } else {
           setDigestState('unavailable')
@@ -508,6 +538,17 @@ function WeeklyReviewPage() {
               <h2 className="mb-3 text-lg font-extrabold text-foreground">{t('Bouba 週統整回饋')}</h2>
               {digestState === 'loading' ? (
                 <p className="text-sm text-muted-foreground">{t('AI 正在整理你這一週的日記…')}</p>
+              ) : digestLocked ? (
+                // 超出額度：報告已生成但只給看前 30%，其餘由軟性付費牆的模糊遮罩處理。
+                <button
+                  onClick={() => setShowSoftPaywall(true)}
+                  className="w-full rounded-2xl bg-muted p-4 text-left"
+                >
+                  <p className="line-clamp-3 whitespace-pre-line text-sm leading-relaxed text-foreground">
+                    {digestToPlainText(digest, t)}
+                  </p>
+                  <p className="mt-3 text-xs font-extrabold text-primary underline">{t('查看方案')}</p>
+                </button>
               ) : (
                 <div className="flex flex-col gap-3">
                   {NARRATIVE_META.map(({ key, label }) => {
@@ -548,6 +589,16 @@ function WeeklyReviewPage() {
         <div aria-hidden className="pointer-events-none fixed left-[-3000px] top-0">
           <ShareCard data={data} digest={digest} t={t} cardRef={shareRef} />
         </div>
+      )}
+
+      {/* 軟性付費牆（規格 §5.4）：半高 sheet，呈現這份報告真實內容的前 30%。 */}
+      {showSoftPaywall && (
+        <SoftPaywallSheet
+          content={digestToPlainText(digest, t)}
+          source="weekly_review"
+          onUpgrade={() => navigate({ to: '/paywall' })}
+          onClose={() => setShowSoftPaywall(false)}
+        />
       )}
     </div>
   )

@@ -118,7 +118,7 @@ function Spinner() {
 
 // ── 主控台（四分頁）─────────────────────────────────────────────────────────
 
-type Tab = 'applications' | 'reviews' | 'published' | 'crises' | 'matching' | 'appVersion' | 'preview'
+type Tab = 'applications' | 'reviews' | 'published' | 'crises' | 'matching' | 'appVersion' | 'subscriptions' | 'preview'
 
 function AdminConsole() {
   const { t } = useLanguage()
@@ -131,6 +131,7 @@ function AdminConsole() {
     { key: 'crises', label: t('危機警示總覽') },
     { key: 'matching', label: t('媒合工作台') },
     { key: 'appVersion', label: t('App 版本控管') },
+    { key: 'subscriptions', label: t('訂閱管理') },
     { key: 'preview', label: t('使用者預覽'), icon: <EyeIcon className="h-4 w-4 shrink-0" /> },
   ]
 
@@ -157,6 +158,7 @@ function AdminConsole() {
         {tab === 'crises' && <CrisisOverviewTab />}
         {tab === 'matching' && <IntakeWorkbenchPreview />}
         {tab === 'appVersion' && <AppVersionTab />}
+        {tab === 'subscriptions' && <SubscriptionsTab />}
         {tab === 'preview' && <MarketplacePreview />}
       </section>
     </div>
@@ -779,6 +781,215 @@ function CrisisOverviewTab() {
 }
 
 // ── App 版本控管 ────────────────────────────────────────────────────────────
+// ── 訂閱管理 ────────────────────────────────────────────────────────────────
+// 這階段不接金流：權益由管理員在這裡手動開通（見 supabase/subscriptions.sql）。
+// 寫入一律走 set_user_subscription() RPC —— subscriptions 表沒有任何
+// INSERT/UPDATE policy，使用者無法自行升級自己。
+
+type SubscriptionRow = {
+  user_id: string
+  name: string | null
+  email: string | null
+  tier: string
+  status: string
+  is_founding_member: boolean
+  expires_at: string | null
+  note: string | null
+  updated_at: string | null
+}
+
+const TIER_OPTIONS = [
+  { value: 'free', label: '免費會員' },
+  { value: 'pro', label: 'Pro 練心會員' },
+  { value: 'pass', label: '練心通行證' },
+]
+
+const STATUS_OPTIONS = ['active', 'trialing', 'grace', 'canceled', 'expired']
+
+function SubscriptionsTab() {
+  const { t } = useLanguage()
+  const [query, setQuery] = useState('')
+  const [rows, setRows] = useState<SubscriptionRow[] | null>(null)
+  const [seats, setSeats] = useState<{ remaining: number; total: number } | null>(null)
+
+  const load = useCallback(async (q: string) => {
+    const [searchRes, seatsRes, cfgRes] = await Promise.all([
+      supabase.rpc('admin_search_subscriptions', { p_query: q }),
+      supabase.rpc('founding_seats_remaining'),
+      supabase.from('paywall_config').select('founding_quota_total').eq('id', 1).maybeSingle(),
+    ])
+    if (searchRes.error) {
+      console.error('[admin_search_subscriptions]', searchRes.error)
+      setRows([])
+    } else {
+      setRows((searchRes.data as SubscriptionRow[]) ?? [])
+    }
+    const total = (cfgRes.data?.founding_quota_total ?? 0) as number
+    const remaining = (seatsRes.data ?? 0) as number
+    setSeats({ remaining, total })
+  }, [])
+
+  useEffect(() => { void load('') }, [load])
+
+  return (
+    <div>
+      <h1 className="mb-1 text-xl font-black text-foreground">{t('訂閱管理')}</h1>
+      <p className="mb-3 text-sm leading-relaxed text-muted-foreground">
+        {t('這階段不接金流，付費權益由這裡手動開通。設定後伺服器端會立即依此判斷所有權益（週分析額度、社群貢獻換觀看、基線重測）。')}
+      </p>
+      {seats && (
+        <p className="mb-4 text-xs font-bold text-primary">
+          {t('創始名額：{used} / {total}', { used: seats.total - seats.remaining, total: seats.total })}
+        </p>
+      )}
+
+      <div className="mb-4 flex gap-2">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') void load(query.trim()) }}
+          placeholder={t('搜尋姓名或 email')}
+          className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/40"
+        />
+        <button
+          onClick={() => void load(query.trim())}
+          className="shrink-0 rounded-xl bg-gradient-primary px-4 py-2 text-sm font-extrabold text-primary-foreground shadow-soft transition active:scale-95"
+        >
+          {t('搜尋')}
+        </button>
+      </div>
+
+      {rows === null ? (
+        <Spinner />
+      ) : rows.length === 0 ? (
+        <EmptyHint>{t('找不到符合的使用者')}</EmptyHint>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {rows.map((r) => (
+            <SubscriptionCard key={r.user_id} row={r} onSaved={() => load(query.trim())} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SubscriptionCard({ row, onSaved }: { row: SubscriptionRow; onSaved: () => Promise<void> }) {
+  const { t } = useLanguage()
+  const [tier, setTier] = useState(row.tier)
+  const [status, setStatus] = useState(row.status)
+  const [founding, setFounding] = useState(row.is_founding_member)
+  const [note, setNote] = useState(row.note ?? '')
+  const [busy, setBusy] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const dirty =
+    tier !== row.tier || status !== row.status ||
+    founding !== row.is_founding_member || note.trim() !== (row.note ?? '')
+
+  const save = async () => {
+    setBusy(true)
+    setError(null)
+    const { error } = await supabase.rpc('set_user_subscription', {
+      p_user_id: row.user_id,
+      p_tier: tier,
+      p_status: status,
+      p_is_founding: founding,
+      p_price_plan_code: null,
+      p_expires_at: null,
+      p_note: note.trim() || null,
+    })
+    setBusy(false)
+    if (error) {
+      console.error('[set_user_subscription]', error)
+      setError(t('更新失敗'))
+      return
+    }
+    await onSaved()
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="min-w-0 truncate text-[15px] font-black text-foreground">
+          {row.name || t('未設定名稱')}
+        </h2>
+        {row.is_founding_member && (
+          <span className="shrink-0 rounded-full bg-gold px-2 py-0.5 text-[11px] font-extrabold text-ink-deep">
+            {t('創始會員')}
+          </span>
+        )}
+      </div>
+      <p className="mt-0.5 truncate text-xs text-muted-foreground">{row.email}</p>
+
+      <div className="mt-3 flex flex-wrap items-end gap-3">
+        <label className="block">
+          <span className="mb-1 block text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+            {t('方案層級')}
+          </span>
+          <select
+            value={tier}
+            onChange={(e) => setTier(e.target.value)}
+            className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/40"
+          >
+            {TIER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{t(o.label)}</option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+            {t('狀態')}
+          </span>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/40"
+          >
+            {STATUS_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
+        </label>
+        <label className="flex items-center gap-2 pb-2">
+          <input
+            type="checkbox"
+            checked={founding}
+            onChange={(e) => setFounding(e.target.checked)}
+            className="h-4 w-4"
+          />
+          <span className="text-sm font-bold text-foreground">{t('設為創始會員')}</span>
+        </label>
+      </div>
+
+      <label className="mt-3 block">
+        <span className="mb-1 block text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+          {t('備註')}
+        </span>
+        <input
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/40"
+        />
+      </label>
+
+      {error && <p className="mt-2 text-xs font-semibold text-red-500">{error}</p>}
+
+      <div className="mt-3 flex items-center gap-3">
+        <button
+          onClick={() => void save()}
+          disabled={!dirty || busy}
+          className="rounded-full bg-gradient-primary px-4 py-2 text-sm font-extrabold text-primary-foreground shadow-soft transition active:scale-95 disabled:opacity-40"
+        >
+          {busy ? t('儲存中…') : t('儲存訂閱設定')}
+        </button>
+        {saved && <span className="text-xs font-bold text-primary">{t('已更新')}</span>}
+      </div>
+    </div>
+  )
+}
+
 // 管理 app_config 表：低於 min_version 的原生殼會被 src/lib/appVersion.ts
 // 全螢幕擋下強制更新。寫入走 update_app_config RPC（內含 is_admin 檢查），
 // 詳見 supabase/app_config.sql 開頭註解。
