@@ -15,6 +15,8 @@ import { cancelWoopReminder } from '../lib/localNotifications'
 import { hardRefresh } from '../lib/refresh'
 import { useLanguage } from '../lib/i18n/context'
 import { translateTexts, type TranslateTargetLang } from '../lib/translate'
+import { fetchEntitlements } from '../lib/entitlements'
+import { CommunityUnlockBanner } from '../components/paywall/CommunityUnlockBanner'
 import avatar1 from '../assets/ui/avatar-1.png'
 import avatar2 from '../assets/ui/avatar-2.png'
 import avatar3 from '../assets/ui/頭像1 Bouba脫帽禮.png'
@@ -193,7 +195,23 @@ async function selectSharedEntries(limit: number, excludeUserId?: string | null)
 }
 
 // 社群動態一批（最新在前；排除工作坊貼文）。range 為含端點的 [offset, offset+limit-1]。
-async function fetchCommunityPage(offset: number, limit: number): Promise<GratitudeEntry[]> {
+//
+// 「貢獻換觀看」（規格 §1.1）：未解鎖的免費會員只看得到 3 則。
+// 真正的把關在資料庫——supabase/subscriptions.sql 把 is_shared 的 RLS policy
+// 改成要 community_unlocked(auth.uid()) 才讀得到，所以未解鎖時這裡的一般查詢
+// 本來就會回空；預覽的 3 則改走 get_community_preview() SECURITY DEFINER RPC，
+// 筆數上限寫死在伺服器，client 傳不進來也改不掉。
+async function fetchCommunityPage(offset: number, limit: number, unlocked: boolean): Promise<GratitudeEntry[]> {
+  if (!unlocked) {
+    // 未解鎖只有第一頁的 3 則，沒有後續分頁。
+    if (offset > 0) return []
+    const { data, error } = await supabase.rpc('get_community_preview')
+    if (error) {
+      console.error('[community] 預覽查詢失敗', error)
+      return []
+    }
+    return ((data as unknown[]) ?? []).map(normalizeEntry)
+  }
   return runWithColFallback((cols) =>
     supabase
       .from('gratitude_entries')
@@ -341,9 +359,13 @@ export const Route = createFileRoute('/app/community')({
     return out
   },
   loader: async () => {
+    // 「貢獻換觀看」：先問伺服器這個人本週解鎖了沒，再決定要撈全部還是預覽 3 則。
+    const entitlements = await fetchEntitlements(true)
+    const unlocked = entitlements.community.unlocked
+
     // 只載第一批社群動態（其餘往下滑再向後端要）。
     const [entries, workshopEntriesRaw, sessionRes] = await Promise.all([
-      fetchCommunityPage(0, PAGE_SIZE),
+      fetchCommunityPage(0, PAGE_SIZE, unlocked),
       fetchWorkshopEntries(),
       supabase.auth.getSession(),
     ])
@@ -363,7 +385,8 @@ export const Route = createFileRoute('/app/community')({
       fetchBlockedIds(userId),
     ])
 
-    const communityHasMore = entries.length === PAGE_SIZE
+    // 未解鎖時只有固定的 3 則預覽，沒有下一頁可撈。
+    const communityHasMore = unlocked && entries.length === PAGE_SIZE
     const myHasMore = myEntries.length === MY_PAGE_SIZE
 
     // 過濾掉已封鎖使用者的工作坊貼文與每日 modal（社群動態/我的貼文在 render 時才濾）
@@ -390,6 +413,7 @@ export const Route = createFileRoute('/app/community')({
         myWorkshopEntries,
         communityHasMore,
         myHasMore,
+        entitlements,
         likes: {} as Record<string, LikeInfo>,
         comments: {} as Record<string, Comment[]>,
         commentLikes: {} as Record<string, LikeInfo>,
@@ -420,6 +444,7 @@ export const Route = createFileRoute('/app/community')({
       myWorkshopEntries,
       communityHasMore,
       myHasMore,
+      entitlements,
       ...supporting,
       anonName,
       userId,
@@ -928,6 +953,9 @@ function CommunityPage() {
   // 從通知或工作坊發佈導引進來（帶 focus / workshop）時不再彈出每日動態 modal
   const { open, close } = useWelcomeModal(!!modalEntry && !focus && !workshop, showEntry === 1)
 
+  // 「貢獻換觀看」狀態，由 loader 向伺服器問來（真正的把關在 RLS，這裡只影響顯示）。
+  const entitlements = loaderData.entitlements ?? null
+
   // 社群動態 / 我的貼文：往下滑時一批批向後端要（規格 1、2）。
   const [communityFeed, setCommunityFeed] = useState<GratitudeEntry[]>(loaderData.entries)
   const [communityHasMore, setCommunityHasMore] = useState<boolean>(loaderData.communityHasMore ?? false)
@@ -986,7 +1014,8 @@ function CommunityPage() {
     communityLoadingRef.current = true
     setCommunityLoading(true)
     try {
-      const next = await fetchCommunityPage(communityOffset.current, PAGE_SIZE)
+      // 未解鎖者 communityHasMore 一律為 false，這裡不會被呼叫；傳 true 只是型別上的補齊。
+      const next = await fetchCommunityPage(communityOffset.current, PAGE_SIZE, true)
       communityOffset.current += next.length
       if (next.length > 0) {
         const support = await fetchSupporting(next, userId)
@@ -1282,6 +1311,8 @@ function CommunityPage() {
           />
         ) : (
           <>
+            {/* 貢獻換觀看狀態（規格 §4.6）。已解鎖或付費會員看到的內容不受影響。 */}
+            <CommunityUnlockBanner entitlements={entitlements} />
             <CommunitySortSelect sort={communitySort} onChange={setCommunitySort} />
             {orderedEntries.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-3xl bg-card py-16 text-muted-foreground shadow-soft">

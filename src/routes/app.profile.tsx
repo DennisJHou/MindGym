@@ -1612,6 +1612,12 @@ function ProfilePage() {
         <div className="rounded-3xl bg-card p-5 shadow-soft">
           <h2 className="mb-3 text-lg font-extrabold text-foreground">{t('帳號設定')}</h2>
           <div className="flex flex-col gap-2">
+            <Link
+              to="/paywall"
+              className="flex h-12 w-full items-center justify-center rounded-2xl bg-primary-soft text-sm font-bold text-foreground transition active:scale-[0.98]"
+            >
+              {t('訂閱方案')}
+            </Link>
             <button
               onClick={() => void handleLogout()}
               className="flex h-12 w-full items-center justify-center rounded-2xl bg-muted text-sm font-bold text-foreground transition active:scale-[0.98]"

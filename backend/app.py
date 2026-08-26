@@ -163,6 +163,110 @@ async def get_user_id(token: str) -> str:
     return resp.json()["id"]
 
 
+# ── 訂閱權益把關 ────────────────────────────────────────────────────────────
+# ⚠️ 這一區是「伺服器端權益判斷」的強制點。前端 src/lib/entitlements.ts 拿到的
+#    權益只決定畫面怎麼顯示；真正擋下超額動作的是這裡與 Supabase 的 RLS policy。
+#    使用者在 devtools 改本機狀態繞不過這裡（user_id 來自已驗證的 JWT）。
+#    對應的資料表與 SQL 版判斷邏輯見 supabase/subscriptions.sql。
+
+async def _subscription_tier(user_id: str) -> str:
+    """讀取訂閱層級（'free' | 'pro' | 'pass'）。
+
+    查無 subscriptions 列 = 免費層（絕大多數既有使用者都沒有這一列），
+    狀態不有效或已過期也一律降回 'free'。判斷邏輯與
+    supabase/subscriptions.sql 的 is_pro() 保持一致。
+    """
+    resp = await db().get(
+        f"{SUPABASE_REST}/subscriptions",
+        headers=SUPABASE_HEADERS,
+        params=[("user_id", f"eq.{user_id}"), ("select", "tier,status,expires_at"), ("limit", "1")],
+    )
+    rows = resp.json() if resp.status_code == 200 else []
+    if not rows:
+        return "free"
+    row = rows[0]
+    if row.get("tier") not in ("pro", "pass"):
+        return "free"
+    if row.get("status") not in ("trialing", "active", "grace"):
+        return "free"
+    expires = row.get("expires_at")
+    if expires:
+        try:
+            if datetime.fromisoformat(str(expires).replace("Z", "+00:00")) <= datetime.now(timezone.utc):
+                return "free"
+        except ValueError:
+            logger.warning("subscriptions.expires_at 格式無法解析: %s", expires)
+    return row["tier"]
+
+
+def _analysis_period_start(tier: str, at: datetime) -> datetime:
+    """AI 週分析的額度週期起點：免費層以「當月」計、付費層以「當週」計。"""
+    if tier == "free":
+        return at.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    return (at - timedelta(days=at.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+async def _annotate_review_lock(user_id: str, row: dict) -> dict:
+    """替一份週分析報告標上 locked，決定前端要顯示全文還是軟性付費牆。
+
+    額度規則（規格 §1.1／§1.2）：免費層每月 1 份、付費層每週 1 份。
+    判定方式是「這份報告是不是它所屬週期裡最早生成的那一份」——
+    比它更早生成的同週期報告若已有 1 份，這份就是超額的，標記為 locked。
+
+    ⚠️ 為什麼是「照常生成、只鎖顯示」而不是直接拒絕生成？
+       規格 §3／§9 要求軟性付費牆必須呈現「真實生成內容的前 30%」，
+       不可用功能清單或空白頁替代——所以報告一定得先真的存在。
+       AI 成本不會因此失控：呼叫端都會先走 _find_existing_review()，
+       同一個 period_start 永遠只生成一次，之後都是讀快取。
+
+    額度用「數既有報告」推導而非另存計數，與 subscriptions.sql 的
+    weekly_analysis_used() 同一套邏輯：不需要重置排程，期間邊界一到自然歸零。
+    """
+    tier = await _subscription_tier(user_id)
+    created_at = row.get("created_at")
+    try:
+        at = datetime.fromisoformat(str(created_at).replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        at = datetime.now(timezone.utc)
+
+    period_start = _analysis_period_start(tier, at)
+    resp = await db().get(
+        f"{SUPABASE_REST}/pro_reviews",
+        headers=SUPABASE_HEADERS,
+        params=[
+            ("user_id", f"eq.{user_id}"),
+            ("review_type", "in.(gratitude_weekly,weekly_digest)"),
+            ("created_at", f"gte.{period_start.isoformat()}"),
+            ("created_at", f"lt.{at.isoformat()}"),
+            ("select", "id"),
+        ],
+    )
+    earlier = len(resp.json()) if resp.status_code == 200 else 0
+    return {**row, "locked": earlier >= 1, "tier": tier}
+
+
+async def _check_baseline_assessment_quota(user_id: str) -> None:
+    """基線檢測額度：免費層限 1 次、付費層無限重測（規格 §2 權益對照表）。
+
+    ⚠️ 第一次檢測永遠放行。規格 §3 明令基線報告是付費牆之前唯一的價值證明，
+       不可鎖——所以這裡只擋「已經做過至少一次、又不是付費會員」的重測。
+    """
+    resp = await db().get(
+        f"{SUPABASE_REST}/perma_scores",
+        headers=SUPABASE_HEADERS,
+        params=[("user_id", f"eq.{user_id}"), ("select", "id"), ("limit", "1")],
+    )
+    already_assessed = bool(resp.json()) if resp.status_code == 200 else False
+    if not already_assessed:
+        return  # 第一次，一律放行
+
+    if await _subscription_tier(user_id) == "free":
+        raise HTTPException(
+            status_code=402,
+            detail={"error": "quota_exceeded", "feature": "baseline_assessment", "tier": "free"},
+        )
+
+
 # ── Models ─────────────────────────────────────────────────────────────────
 
 class GratitudeTagRequest(BaseModel):
@@ -654,6 +758,10 @@ async def generate_report(
 ):
     token = authorization.removeprefix("Bearer ").strip()
     user_id = await get_user_id(token)
+
+    # 基線檢測額度：免費層限 1 次、付費層無限重測（規格 §2 權益對照表）。
+    # ⚠️ 第一次檢測永遠放行——那是付費牆之前唯一的價值證明，規格 §3 明令不可鎖。
+    await _check_baseline_assessment_quota(user_id)
 
     for field, text in answers.model_dump().items():
         if len(text.strip()) < 10:
@@ -1592,7 +1700,7 @@ async def reviews_gratitude_weekly(req: GratitudeWeeklyRequest, authorization: s
 
     existing = await _find_existing_review(user_id, None, "gratitude_weekly", start.isoformat())
     if existing:
-        return existing
+        return await _annotate_review_lock(user_id, existing)
 
     entries_resp = await db().get(
         f"{SUPABASE_REST}/gratitude_entries",
@@ -1646,7 +1754,8 @@ async def reviews_gratitude_weekly(req: GratitudeWeeklyRequest, authorization: s
         content_json = _fallback_review_content(title, entry_count)
         content_json["trend"] = [{"date": e["entry_date"], "score": 1} for e in entries]
 
-    return await _insert_review(user_id, None, "gratitude_weekly", start.isoformat(), end.isoformat(), entry_count, content_json)
+    row = await _insert_review(user_id, None, "gratitude_weekly", start.isoformat(), end.isoformat(), entry_count, content_json)
+    return await _annotate_review_lock(user_id, row)
 
 
 # 一週回顧的 AI 週統整分析 prompt。架構依 Zeng, Chang, Lin, & Yeh (2026)
@@ -1747,13 +1856,14 @@ async def reviews_weekly_digest(req: WeeklyDigestRequest, authorization: str = H
     existing = await _find_existing_review(user_id, None, "weekly_digest", start.isoformat())
     existing_content = (existing or {}).get("content") or {}
     if existing and int(existing_content.get("v") or 0) >= 4:
-        return existing
+        # 該週已有 v4 分析，直接返回（無論什麼時間）；仍需標記是否超額（規格 §3／§9）。
+        return await _annotate_review_lock(user_id, existing)
 
     # 當週尚未到周日不重新分析；過去週允許把舊版感恩限定快取升級成全日記 v4。
     today_tw = datetime.now(TW_TZ).date()
     if not is_sunday_tw() and end >= today_tw:
         if existing:
-            return existing
+            return await _annotate_review_lock(user_id, existing)
         raise HTTPException(status_code=409, detail="AI 分析將在本周日生成")
 
     # 每一件都保留日期與日記類型：情緒可按日彙整，感恩深度則只編碼感恩日記。
@@ -1839,11 +1949,12 @@ async def reviews_weekly_digest(req: WeeklyDigestRequest, authorization: str = H
             )
             rows = resp.json() if resp.status_code == 200 else []
             if rows:
-                return rows[0]
+                return await _annotate_review_lock(user_id, rows[0])
             logger.warning("weekly_digest update failed: %s", resp.text)
         else:
             try:
-                return await _insert_review(user_id, None, "weekly_digest", start.isoformat(), end.isoformat(), entry_count, content_json)
+                row = await _insert_review(user_id, None, "weekly_digest", start.isoformat(), end.isoformat(), entry_count, content_json)
+                return await _annotate_review_lock(user_id, row)
             except HTTPException:
                 # 儲存失敗（最常見：weekly_digest.sql 的 CHECK 約束遷移還沒跑）：
                 # 分析結果照樣回傳，只是這次不快取；遷移執行後自動恢復快取行為。

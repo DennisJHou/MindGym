@@ -12,6 +12,7 @@ import { markOnboardingSkipped } from '../lib/onboardingSkip'
 import { useLanguage } from '../lib/i18n/context'
 import { LanguageSwitcherCompact } from '../components/LanguageSwitcher'
 import { useGlobalKeyboard } from '../lib/keyboard'
+import { PaywallScreen } from '../components/paywall/PaywallScreen'
 
 // ── Route ─────────────────────────────────────────────────────────────────
 
@@ -258,6 +259,8 @@ function OnboardingPage() {
   const [report, setReport] = useState<InMindReport | null>(latestReport ?? null)
   const [apiError, setApiError] = useState('')
   const [isTimeoutError, setIsTimeoutError] = useState(false)
+  // 規格 Day 0：基線報告看完後自然接到付費牆。重測／回看舊報告不再出現。
+  const [showPaywall, setShowPaywall] = useState(false)
 
   // 測驗不再強制：進行到一半也能由左往右滑或按返回鍵放棄，退回到可以「跳過測驗」的入口頁。
   const triggerBack = useStageBack(screen, (s) => s !== 'quiz', () => setScreen('intro'))
@@ -305,8 +308,20 @@ function OnboardingPage() {
     }
   }
 
+  // 第一次做完檢測 → 先看付費牆（規格 Day 0：報告結尾自然接到付費牆）。
+  // 重測或回看舊報告的情境維持原行為，不打擾已經看過的人。
   function handleComplete() {
-    navigate({ to: (reassess || showResult) ? '/app/home' : '/app/gratitude' })
+    if (reassess || showResult) {
+      navigate({ to: '/app/home' })
+      return
+    }
+    setShowPaywall(true)
+  }
+
+  // 付費牆關閉（✕ 或「先自己逛逛」）後，continue 到原本的目的地。
+  function handlePaywallDismiss() {
+    setShowPaywall(false)
+    navigate({ to: '/app/gratitude' })
   }
 
   let content: ReactNode
@@ -363,6 +378,14 @@ function OnboardingPage() {
     <div className="mx-auto max-w-[430px]">
       <LanguageSwitcherCompact className="fixed top-[calc(env(safe-area-inset-top)+0.75rem)] right-4 z-40" />
       {content}
+      {/* 基線報告看完 → 付費牆（規格 Day 0）。帶入剛算出的 PERMA 分數做個人化標頭。 */}
+      {showPaywall && (
+        <PaywallScreen
+          source="onboarding"
+          scores={report?.scores ?? null}
+          onDismiss={handlePaywallDismiss}
+        />
+      )}
     </div>
   )
 }
