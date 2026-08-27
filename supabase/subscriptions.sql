@@ -88,6 +88,10 @@ CREATE TABLE IF NOT EXISTS paywall_config (
   updated_at           timestamptz NOT NULL DEFAULT now()
 );
 
+-- 補欄位（冪等）：未貢獻的免費會員在社群能看幾則。
+-- 做成設定值而非寫死，之後要調整只要 UPDATE 這一格，不用改程式碼也不用重新部署。
+ALTER TABLE paywall_config ADD COLUMN IF NOT EXISTS free_view_limit integer NOT NULL DEFAULT 15;
+
 ALTER TABLE paywall_config ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "paywall_config_public_read" ON paywall_config;
 CREATE POLICY "paywall_config_public_read" ON paywall_config FOR SELECT USING (true);
@@ -236,7 +240,8 @@ BEGIN
         SELECT 1 FROM gratitude_entries
         WHERE user_id = uid AND is_shared = true AND created_at >= date_trunc('week', now())
       ),
-      'free_view_limit', 3   -- 規格 §1.1：未貢獻只能看 3 則
+      -- 未貢獻時能看幾則，讀 paywall_config；查不到設定時保守退回 15。
+      'free_view_limit', COALESCE((SELECT free_view_limit FROM paywall_config WHERE id = 1), 15)
     ),
     'baseline_assessment', jsonb_build_object(
       'used',          v_perma_used,
@@ -259,14 +264,18 @@ DROP POLICY IF EXISTS "gratitude_entries: is_shared 資料公開可讀" ON grati
 CREATE POLICY "gratitude_entries: is_shared 資料公開可讀" ON gratitude_entries
   FOR SELECT USING (is_shared = true AND community_unlocked(auth.uid()));
 
--- 未解鎖者的免費預覽：固定回最新 3 則分享紀錄。
--- SECURITY DEFINER 以繞過上面的 policy；筆數上限寫死在伺服器，client 傳不進來。
+-- 未解鎖者的免費預覽：回最新 N 則分享紀錄，N 讀 paywall_config.free_view_limit。
+-- SECURITY DEFINER 以繞過上面的 policy；筆數上限由伺服器決定，client 傳不進來也改不掉。
+--
+-- ⚠️ COALESCE 的位置很重要：paywall_config 若沒有那一列，子查詢會是 NULL，
+--    而 Postgres 的 LIMIT NULL 等同「不限筆數」——那會讓未解鎖者看到全部貼文。
+--    所以一定要在進 LIMIT 前就把 NULL 收掉。
 CREATE OR REPLACE FUNCTION get_community_preview() RETURNS SETOF gratitude_entries
 LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
   SELECT * FROM gratitude_entries
   WHERE is_shared = true
   ORDER BY created_at DESC
-  LIMIT 3
+  LIMIT (SELECT COALESCE((SELECT free_view_limit FROM paywall_config WHERE id = 1), 15))
 $$;
 
 -- ============================================================
@@ -338,7 +347,8 @@ BEGIN
 END; $$;
 
 CREATE OR REPLACE FUNCTION update_paywall_config(
-  p_founding_quota_total integer, p_founding_enabled boolean, p_variant text
+  p_founding_quota_total integer, p_founding_enabled boolean, p_variant text,
+  p_free_view_limit integer DEFAULT NULL
 ) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   IF NOT is_admin(auth.uid()) THEN RAISE EXCEPTION '僅限管理員操作'; END IF;
@@ -346,6 +356,8 @@ BEGIN
      SET founding_quota_total = p_founding_quota_total,
          founding_enabled = p_founding_enabled,
          variant = p_variant,
+         -- 沒傳就沿用現值，避免呼叫端漏傳時意外把上限歸零
+         free_view_limit = COALESCE(p_free_view_limit, free_view_limit),
          updated_at = now()
    WHERE id = 1;
 END; $$;

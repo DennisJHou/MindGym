@@ -48,7 +48,7 @@ export const FREE_FALLBACK: Entitlements = {
   is_founding_member: false,
   expires_at: null,
   weekly_analysis: { period: 'month', period_start: '', limit: 1, used: 1, remaining: 0 },
-  community: { unlimited: false, unlocked: false, contributed_this_week: false, free_view_limit: 3 },
+  community: { unlimited: false, unlocked: false, contributed_this_week: false, free_view_limit: 15 },
   baseline_assessment: { used: 1, can_retake: false },
   can_view_trends: false,
   can_view_growth_comparison: false,
