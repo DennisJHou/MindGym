@@ -196,21 +196,39 @@ async function selectSharedEntries(limit: number, excludeUserId?: string | null)
 
 // 社群動態一批（最新在前；排除工作坊貼文）。range 為含端點的 [offset, offset+limit-1]。
 //
-// 「貢獻換觀看」（規格 §1.1）：未解鎖的免費會員只看得到 3 則。
+// 「貢獻換觀看」（規格 §1.1）：未解鎖的免費會員只看得到有限則數
+// （paywall_config.free_view_limit，目前預設 15）。
 // 真正的把關在資料庫——supabase/subscriptions.sql 把 is_shared 的 RLS policy
 // 改成要 community_unlocked(auth.uid()) 才讀得到，所以未解鎖時這裡的一般查詢
-// 本來就會回空；預覽的 3 則改走 get_community_preview() SECURITY DEFINER RPC，
-// 筆數上限寫死在伺服器，client 傳不進來也改不掉。
+// 本來就會回空；預覽改走 get_community_preview() SECURITY DEFINER RPC，
+// 筆數上限由伺服器端設定值決定，client 傳不進來也改不掉。
 async function fetchCommunityPage(offset: number, limit: number, unlocked: boolean): Promise<GratitudeEntry[]> {
   if (!unlocked) {
-    // 未解鎖只有第一頁的 3 則，沒有後續分頁。
+    // 未解鎖只有第一頁（免費預覽則數），沒有後續分頁。
     if (offset > 0) return []
     const { data, error } = await supabase.rpc('get_community_preview')
     if (error) {
       console.error('[community] 預覽查詢失敗', error)
       return []
     }
-    return ((data as unknown[]) ?? []).map(normalizeEntry)
+    const entries = ((data as unknown[]) ?? []).map(normalizeEntry)
+    // get_community_preview() 回傳 SETOF gratitude_entries（純表格列，刻意用
+    // SELECT * 撐過欄位尚未 migrate 的情況），沒有 runWithColFallback 那種
+    // `profiles(current_streak)` embedded join，所以這裡另外補一次查詢把
+    // 「連續 N 天」榮譽徽章接回去，不然預覽區塊會悄悄不見這個徽章。
+    const userIds = [...new Set(entries.map((e) => e.user_id).filter((id): id is string => !!id))]
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, current_streak')
+        .in('id', userIds)
+      const streakByUser = new Map((profiles ?? []).map((p) => [p.id, p.current_streak as number | null]))
+      for (const e of entries) {
+        const streak = e.user_id ? streakByUser.get(e.user_id) : null
+        if (typeof streak === 'number') e.current_streak = streak
+      }
+    }
+    return entries
   }
   return runWithColFallback((cols) =>
     supabase
