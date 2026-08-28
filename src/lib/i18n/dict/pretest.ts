@@ -60,6 +60,11 @@ export const pretest: Record<string, Translation> = {
     en: 'There’s a temporary issue with the network or AI service — please try again shortly.',
   },
   '重新嘗試': { 'zh-CN': '重新尝试', en: 'Try Again' },
+  '回去看我的答案': { 'zh-CN': '回去看我的答案', en: 'Back to my answers' },
+  '你剛剛填的內容都已經保留，重試不會清空。': {
+    'zh-CN': '你刚刚填的内容都已经保留，重试不会清空。',
+    en: 'Everything you wrote has been saved — retrying won’t clear it.',
+  },
   '未知錯誤': { 'zh-CN': '未知错误', en: 'Unknown error' },
 
   // ── DIMENSION_CONFIGS (types.ts) ─────────────────────────
