@@ -88,6 +88,17 @@ html.native-app [contenteditable='true'] {
   user-select: text;
 }
 
+/* 長按練習卡片（例如首頁的「感恩日記」）時，iOS Safari 會把它當成一般網頁
+   連結，跳出「Open Link / Copy Link / Share」的預覽選單，在 App 化的介面
+   裡只是干擾。關掉 App 畫面內導覽連結的 callout 與長按反白即可。
+   輸入框與可編輯內容不受影響（上面的規則優先開放）；桌機滑鼠行為也完全
+   不變，這兩個屬性只作用於觸控長按。 */
+.app-frame a {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 /* ── 桌面網頁版「手機外框」──────────────────────────────────────────
    問題：練習頁封面圖用「滿版出血」手法（-mx-[50vw] + w-screen）撐滿整個
    瀏覽器視窗，在手機上剛好貼齊螢幕邊緣，但桌面寬螢幕開網頁版時會被撐到
@@ -117,6 +128,33 @@ html:not(.native-app) .frame-width {
 }
 .app-frame {
   container-type: inline-size;
+}
+
+/* --frame-gutter：外框左右各留的空白寬度。
+   .frame-width 只解決「有寬度的元素要置中」，但貼著畫面邊緣的 position:
+   fixed 浮動元件（側邊選單、角落的語言／靜音浮標）沒有寬度可收，它們是
+   直接吃 right: 0 貼在瀏覽器視窗邊緣——桌面上就會離手機外框好幾百 px，
+   點外框裡的選單鈕、選單卻從視窗最右邊飛出來。這些元件改用
+   right: var(--frame-gutter)（或 calc(var(--frame-gutter) + 原本的邊距)）
+   就會貼齊外框邊緣。
+   App 版恆為 0px，行為與新增前完全一致。 */
+:root {
+  --frame-gutter: 0px;
+}
+html:not(.native-app) {
+  --frame-gutter: max(0px, calc((100vw - 480px) / 2));
+}
+
+/* 側邊選單「收起」時要一併 visibility: hidden——網頁版外框右邊的留白也在
+   畫面上，光靠 translate-x-full 位移，寬螢幕會看到選單停在外框旁邊沒消失。
+   同樣只在網頁版套用：App 版 gutter 為 0，位移出去本來就在畫面外，不需要
+   （也不會）多這道隱藏，動畫與行為跟改動前一模一樣。
+   visibility 要一起放進 transition-property，滑出動畫才會跑完才隱藏。 */
+html:not(.native-app) .frame-drawer {
+  transition-property: transform, visibility;
+}
+html:not(.native-app) .frame-drawer-closed {
+  visibility: hidden;
 }
 
 /* 字體大小設定（無障礙大字模式）。所有 rem 字級會隨 html font-size 一起放大。 */

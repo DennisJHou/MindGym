@@ -125,9 +125,14 @@ function TopHeader() {
       )}
 
       {/* Side Drawer */}
+      {/* right-[var(--frame-gutter)]：網頁版貼齊手機外框的右緣；App 版 gutter 為 0px，
+          算出來就是原本的 right: 0。frame-drawer／frame-drawer-closed 這兩個 class
+          的規則也只在網頁版生效（詳見 index.css），所以 App 版行為完全沒變。 */}
       <aside
-        className={`fixed top-0 right-0 z-50 flex h-full w-[300px] flex-col overflow-y-auto bg-[#FEFAF0] transition-transform duration-300 ${
-          drawerOpen ? 'translate-x-0 shadow-[-10px_0_30px_rgba(40,24,12,0.25)]' : 'translate-x-full'
+        className={`frame-drawer fixed top-0 right-[var(--frame-gutter)] z-50 flex h-full w-[300px] flex-col overflow-y-auto bg-[#FEFAF0] transition-transform duration-300 ${
+          drawerOpen
+            ? 'translate-x-0 shadow-[-10px_0_30px_rgba(40,24,12,0.25)]'
+            : 'frame-drawer-closed translate-x-full'
         }`}
       >
         <div className="flex items-center justify-between px-7 pb-3 pt-[calc(env(safe-area-inset-top)+1.6rem)]">

@@ -155,7 +155,7 @@ function LoginPage() {
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-end overflow-x-hidden px-6 pt-12">
-      <LanguageSwitcherCompact className="fixed top-[calc(env(safe-area-inset-top)+1rem)] right-4 z-20" />
+      <LanguageSwitcherCompact className="fixed top-[calc(env(safe-area-inset-top)+1rem)] right-[calc(var(--frame-gutter)+1rem)] z-20" />
       {inAppNotice && (
         <InAppBrowserNotice
           browser={inAppNotice}
