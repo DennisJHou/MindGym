@@ -35,6 +35,19 @@ export const authPages: Record<string, Translation> = {
   '已有帳號？前往登入': { 'zh-CN': '已有账号？前往登录', en: 'Already have an account? Log in' },
   '忘記密碼？': { 'zh-CN': '忘记密码？', en: 'Forgot password?' },
   '用 Apple 登入': { 'zh-CN': '用 Apple 登录', en: 'Sign in with Apple' },
+
+  // 條款同意（App Store 審查指南 1.2：註冊／登入前必須同意條款）
+  '我已閱讀並同意': { 'zh-CN': '我已阅读并同意', en: 'I have read and agree to the' },
+  '與': { 'zh-CN': '与', en: 'and' },
+  '，並瞭解本服務對冒犯內容與濫用行為採取零容忍政策。': {
+    'zh-CN': '，并了解本服务对冒犯内容与滥用行为采取零容忍政策。',
+    en: ', and understand this service has zero tolerance for objectionable content and abusive users.',
+  },
+  '請先勾選同意使用者條款，才能繼續。': {
+    'zh-CN': '请先勾选同意用户条款，才能继续。',
+    en: 'Please agree to the Terms of Use to continue.',
+  },
+  '使用者條款': { 'zh-CN': '用户条款', en: 'Terms of Use' },
   '嗨，很高興認識你！歡迎來到 PSY by PSY 心理健身房。': {
     'zh-CN': '嗨，很高兴认识你！欢迎来到 PSY by PSY 心理健身房。',
     en: 'Hi, nice to meet you! Welcome to PSY by PSY Mental Fitness Gym.',

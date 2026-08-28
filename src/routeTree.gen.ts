@@ -13,6 +13,7 @@
 import { Route as rootRoute } from './routes/__root'
 import { Route as WelcomeImport } from './routes/welcome'
 import { Route as TherapistImport } from './routes/therapist'
+import { Route as TermsImport } from './routes/terms'
 import { Route as StaffImport } from './routes/staff'
 import { Route as ProfessionalImport } from './routes/professional'
 import { Route as PrivacyImport } from './routes/privacy'
@@ -48,6 +49,12 @@ const WelcomeRoute = WelcomeImport.update({
 const TherapistRoute = TherapistImport.update({
   id: '/therapist',
   path: '/therapist',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const TermsRoute = TermsImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -256,6 +263,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StaffImport
       parentRoute: typeof rootRoute
     }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsImport
+      parentRoute: typeof rootRoute
+    }
     '/therapist': {
       id: '/therapist'
       path: '/therapist'
@@ -419,6 +433,7 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/professional': typeof ProfessionalRoute
   '/staff': typeof StaffRoute
+  '/terms': typeof TermsRoute
   '/therapist': typeof TherapistRoute
   '/welcome': typeof WelcomeRoute
   '/app/community': typeof AppCommunityRoute
@@ -447,6 +462,7 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/professional': typeof ProfessionalRoute
   '/staff': typeof StaffRoute
+  '/terms': typeof TermsRoute
   '/therapist': typeof TherapistRoute
   '/welcome': typeof WelcomeRoute
   '/app/community': typeof AppCommunityRoute
@@ -476,6 +492,7 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/professional': typeof ProfessionalRoute
   '/staff': typeof StaffRoute
+  '/terms': typeof TermsRoute
   '/therapist': typeof TherapistRoute
   '/welcome': typeof WelcomeRoute
   '/app/community': typeof AppCommunityRoute
@@ -506,6 +523,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/professional'
     | '/staff'
+    | '/terms'
     | '/therapist'
     | '/welcome'
     | '/app/community'
@@ -533,6 +551,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/professional'
     | '/staff'
+    | '/terms'
     | '/therapist'
     | '/welcome'
     | '/app/community'
@@ -560,6 +579,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/professional'
     | '/staff'
+    | '/terms'
     | '/therapist'
     | '/welcome'
     | '/app/community'
@@ -589,6 +609,7 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   ProfessionalRoute: typeof ProfessionalRoute
   StaffRoute: typeof StaffRoute
+  TermsRoute: typeof TermsRoute
   TherapistRoute: typeof TherapistRoute
   WelcomeRoute: typeof WelcomeRoute
 }
@@ -603,6 +624,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   ProfessionalRoute: ProfessionalRoute,
   StaffRoute: StaffRoute,
+  TermsRoute: TermsRoute,
   TherapistRoute: TherapistRoute,
   WelcomeRoute: WelcomeRoute,
 }
@@ -626,6 +648,7 @@ export const routeTree = rootRoute
         "/privacy",
         "/professional",
         "/staff",
+        "/terms",
         "/therapist",
         "/welcome"
       ]
@@ -672,6 +695,9 @@ export const routeTree = rootRoute
     },
     "/staff": {
       "filePath": "staff.tsx"
+    },
+    "/terms": {
+      "filePath": "terms.tsx"
     },
     "/therapist": {
       "filePath": "therapist.tsx"
