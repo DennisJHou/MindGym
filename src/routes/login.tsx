@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute, redirect, Link } from '@tanstack/react-router'
 import { supabase } from '../lib/supabase'
 import { track } from '../lib/analytics'
 import {
@@ -40,8 +40,20 @@ function LoginPage() {
   // 這裡記錄是哪一種 App，好顯示對應的引導畫面（null = 不顯示）。
   const [inAppNotice, setInAppNotice] = useState<InAppBrowser>(null)
   const [copied, setCopied] = useState(false)
+  // App Store 審查指南 1.2：使用者必須在「註冊或登入前」同意條款。
+  // 未勾選時所有登入方式（帳密／Apple／Google）一律擋下，不是只擋其中一種。
+  const [agreed, setAgreed] = useState(false)
+  const [showAgreeHint, setShowAgreeHint] = useState(false)
+
+  /** 未同意條款就擋下，並提示使用者。回傳 true 代表可以繼續。 */
+  const requireAgreement = (): boolean => {
+    if (agreed) return true
+    setShowAgreeHint(true)
+    return false
+  }
 
   const handleGoogleLogin = async () => {
+    if (!requireAgreement()) return
     // 原生 App（iOS）：Google 會擋嵌入式 WebView，改用系統瀏覽器 + deep link。
     // 詳見 src/lib/nativeAuth.ts。網頁版不走這條路（isNativeApp() 為 false）。
     if (isNativeApp()) {
@@ -79,6 +91,7 @@ function LoginPage() {
   // Sign in with Apple 只在原生 iOS App 裡顯示（見 src/lib/appleAuth.ts），
   // 網頁版沒有這顆按鈕，故這裡不用像 handleGoogleLogin 一樣處理網頁版分支。
   const handleAppleLogin = async () => {
+    if (!requireAgreement()) return
     try {
       track('login_started', { method: 'apple', platform: 'native' })
       await signInWithAppleNative()
@@ -100,6 +113,7 @@ function LoginPage() {
   }
 
   const handleSubmitPassword = async () => {
+    if (!requireAgreement()) return
     const trimmedEmail = email.trim()
     if (!trimmedEmail || !password) return
     setLoading(true)
@@ -287,6 +301,37 @@ function LoginPage() {
             <GoogleIcon />
             {t('用 Google 登入')}
           </button>
+
+          {/* 條款同意（App Store 審查指南 1.2）。
+              放在所有登入按鈕「下方」但仍在同一個面板內，讓審查錄影一次拍到
+              「同意項 + 登入按鈕」；未勾選時按任何登入方式都會被 requireAgreement() 擋下。 */}
+          <label className="flex cursor-pointer items-start gap-2.5 px-1 pt-1">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => {
+                setAgreed(e.target.checked)
+                if (e.target.checked) setShowAgreeHint(false)
+              }}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-[color:var(--primary)]"
+            />
+            <span className="text-[11px] leading-relaxed text-muted-foreground">
+              {t('我已閱讀並同意')}
+              <Link to="/terms" className="mx-1 font-bold text-foreground underline">
+                {t('使用者條款')}
+              </Link>
+              {t('與')}
+              <Link to="/privacy" className="mx-1 font-bold text-foreground underline">
+                {t('隱私政策')}
+              </Link>
+              {t('，並瞭解本服務對冒犯內容與濫用行為採取零容忍政策。')}
+            </span>
+          </label>
+          {showAgreeHint && !agreed && (
+            <p className="px-1 text-[11px] font-semibold text-red-500">
+              {t('請先勾選同意使用者條款，才能繼續。')}
+            </p>
+          )}
 
           <p className="text-center text-[10px] font-extrabold uppercase tracking-[0.25em] text-muted-foreground">
             PSY by PSY · Train your mind
