@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { PrimaryCta } from './PrimaryCta'
 
 export interface DateSwipeOption {
@@ -46,6 +46,13 @@ export function DateSwipeSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // sheet 開啟期間鎖住背景頁面，避免滾輪滑到底時把捲動接力給後面的頁面。
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [])
+
   function scrollToIndex(i: number, behavior: ScrollBehavior = 'smooth') {
     const track = trackRef.current
     const card = cardRefs.current[i]
@@ -72,7 +79,8 @@ export function DateSwipeSheet({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40"
+      className="fixed inset-0 z-[60] flex items-end justify-center overscroll-none bg-black/40"
+      style={{ touchAction: 'none' }}
       onClick={onClose}
     >
       <div
@@ -99,8 +107,8 @@ export function DateSwipeSheet({
           <div
             ref={trackRef}
             onScroll={handleScroll}
-            style={{ height: `${TRACK_HEIGHT_REM}rem` }}
-            className="no-scrollbar flex snap-y snap-mandatory flex-col gap-2 overflow-y-auto scroll-smooth py-[calc((13.125rem-3.75rem)/2)]"
+            style={{ height: `${TRACK_HEIGHT_REM}rem`, touchAction: 'pan-y' }}
+            className="no-scrollbar flex snap-y snap-mandatory flex-col gap-2 overflow-y-auto overscroll-contain scroll-smooth py-[calc((13.125rem-3.75rem)/2)]"
           >
             {options.map((opt, i) => {
               const active = i === activeIndex
@@ -109,7 +117,7 @@ export function DateSwipeSheet({
                   key={opt.iso}
                   ref={(el) => { cardRefs.current[i] = el }}
                   type="button"
-                  onClick={() => scrollToIndex(i)}
+                  onClick={() => { setActiveIndex(i); scrollToIndex(i) }}
                   style={{ height: `${CARD_HEIGHT_REM}rem` }}
                   className={`flex shrink-0 snap-center flex-col items-center justify-center gap-0.5 rounded-2xl px-3 text-center transition ${
                     active ? 'text-foreground' : 'text-muted-foreground opacity-60'
