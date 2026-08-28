@@ -14,6 +14,7 @@ import {
 import { registerForPush } from '../lib/pushNotifications'
 import { fetchBlockedList, unblockUser, type BlockedListItem } from '../lib/communityModeration'
 import { useGlobalKeyboard } from '../lib/keyboard'
+import { flushStaleGratitudeDraft } from '../lib/gratitudeEntry'
 import { hardRefresh } from '../lib/refresh'
 import { useScrollDirection } from '../lib/useScrollDirection'
 import { useLanguage } from '../lib/i18n/context'
@@ -33,6 +34,14 @@ function AppShell() {
   // 進到（已登入的）App 區域時，若已授權通知就（重新）註冊遠端推播，
   // 確保 device token 對應到目前登入的帳號（startup 時可能 session 還沒就緒）。
   useEffect(() => { void registerForPush() }, [])
+
+  // 感恩日記寫到一半、分享圖片後 WebView 被系統回收的情況：兩小時內回來會直接
+  // 接回原本的畫面（見 app.gratitude），太久沒回來的就在這裡自動存成「僅限本人」，
+  // 內容才不會白寫。放在 /app 這層，是因為使用者回來後不一定會再打開感恩日記。
+  const { session } = Route.useRouteContext()
+  useEffect(() => {
+    void flushStaleGratitudeDraft(session?.user?.id)
+  }, [session?.user?.id])
 
   // 全站鍵盤行為（規格 [2][5]）：點空白處收鍵盤、鍵盤彈出時補底部留白。
   useGlobalKeyboard()

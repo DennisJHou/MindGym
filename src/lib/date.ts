@@ -11,3 +11,12 @@
 export function isoLocalDate(d: Date = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
+
+/** isoLocalDate 的反向：把 YYYY-MM-DD 解析回「本地時區當天零點」的 Date。
+    刻意不用 new Date('YYYY-MM-DD')——那會被當成 UTC 午夜，在台灣（UTC+8）
+    以外的負時區會倒退一天。 */
+export function parseLocalDate(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number)
+  if (!y || !m || !d) return new Date()
+  return new Date(y, m - 1, d)
+}

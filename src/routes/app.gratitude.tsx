@@ -2,8 +2,8 @@ import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useLanguage } from '../lib/i18n/context'
-import { computeStreak, computeUnifiedStreak, streakFromDates } from '../lib/streak'
-import { isoLocalDate } from '../lib/date'
+import { computeStreak, streakFromDates } from '../lib/streak'
+import { isoLocalDate, parseLocalDate } from '../lib/date'
 import { saveOrShareImage } from '../lib/shareImage'
 import { PrimaryCta } from '../components/PrimaryCta'
 import { DateSwipeSheet } from '../components/DateSwipeSheet'
@@ -15,20 +15,27 @@ import { TheorySection } from '../components/TheorySection'
 import { track } from '../lib/analytics'
 import { useStageBack } from '../lib/useStageBack'
 import { type Privacy, DEFAULT_PRIVACY, PRIVACY_OPTIONS, privacyToFields } from '../lib/privacy'
+import {
+  fetchGratitudeSummary as fetchSummary,
+  fetchGratitudeTags as fetchTags,
+  pickAnonName,
+  saveGratitudeEntry,
+  type Difficulty,
+  type GratitudeItems,
+  type SummaryResult,
+  type TagResult,
+  type TargetCode,
+} from '../lib/gratitudeEntry'
+import {
+  clearGratitudeDraft,
+  gratitudeDraftKey,
+  hasContent,
+  loadGratitudeDraft,
+  saveGratitudeDraft,
+} from '../lib/gratitudeDraft'
 import heartsBanner from '../assets/ui/hearts-banner.png'
 import celebrateHearts from '../assets/ui/celebrate-hearts.png'
 import floatingBouba from '../assets/ui/飄浮Bouba.png'
-
-const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8000'
-
-// 匿名顯示名稱：直接寫入 DB 的 anon_name 欄位，故意不走 t() 翻譯——
-// 這是儲存進資料庫的資料值（非畫面即時渲染文字），若隨語言切換翻譯，
-// 同一篇貼文在不同語言使用者眼中會顯示不同名字，並非預期行為。
-const ANON_NAMES = ['溫暖的星火', '清晨的微風', '靜謐的月光', '晴天的微笑', '輕盈的雲朵']
-
-function pickAnonName() {
-  return ANON_NAMES[Math.floor(Math.random() * ANON_NAMES.length)]
-}
 
 // t() 的型別別名，供元件外的純函式接參數用（不能在裡面呼叫 useLanguage）。
 type TFn = (text: string, vars?: Record<string, string | number>) => string
@@ -38,26 +45,7 @@ export const Route = createFileRoute('/app/gratitude')({
 })
 
 type Stage = 'INTRO' | 'WRITING' | 'SUMMARY' | 'CELEBRATE'
-type Difficulty = 'basic' | 'advanced'
 type ItemKey = 'item_1' | 'item_2' | 'item_3'
-type TargetCode = 'others' | 'self' | 'environment' | 'experience' | 'custom'
-
-interface GratitudeItems {
-  item_1: string
-  item_2: string
-  item_3: string
-}
-
-interface TagResult {
-  item: number
-  target: TargetCode
-  label: string
-}
-
-interface SummaryResult {
-  emotional_summary: string
-  resonance_story: string
-}
 
 function getTargetMeta(t: TFn): Record<TargetCode, { label: string }> {
   return {
@@ -162,62 +150,24 @@ function formatWritingDate(date: Date): string {
   return `${y} / ${m} / ${d}（${days[date.getDay()]}）`
 }
 
-// 行動網路偶爾會讓連線卡住卻不結束，fetch 預設沒有逾時 → promise 永遠不 resolve，
-// 使用者就「等不到回應」。用 AbortController 設上限，逾時就丟錯，讓呼叫端走既有的
-// 失敗 fallback（顯示友善訊息 / 以 null ai_feedback 存檔），而不是無限轉圈。
-const AI_FETCH_TIMEOUT_MS = 30000
-
-async function fetchWithTimeout(input: string, init: RequestInit, timeoutMs = AI_FETCH_TIMEOUT_MS): Promise<Response> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    return await fetch(input, { ...init, signal: controller.signal })
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
-async function fetchSummary(items: GratitudeItems, difficulty: Difficulty): Promise<SummaryResult> {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) throw new Error('Not authenticated')
-  const resp = await fetchWithTimeout(`${API_URL}/api/gratitude-summary`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`,
-    },
-    body: JSON.stringify({ ...items, difficulty }),
-  })
-  if (!resp.ok) throw new Error(`API error: ${resp.status}`)
-  const data = await resp.json() as { emotional_summary?: string; resonance_story?: string }
-  if (!data.emotional_summary) throw new Error('Empty summary')
-  return {
-    emotional_summary: data.emotional_summary,
-    resonance_story: data.resonance_story ?? '',
-  }
-}
-
-async function fetchTags(items: GratitudeItems): Promise<TagResult[]> {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) throw new Error('Not authenticated')
-  const resp = await fetchWithTimeout(`${API_URL}/api/tag-gratitude-targets`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`,
-    },
-    body: JSON.stringify(items),
-  })
-  if (!resp.ok) throw new Error(`API error: ${resp.status}`)
-  const data = await resp.json() as { tags?: TagResult[] }
-  return data.tags ?? []
-}
-
 function GratitudePage() {
   const { t } = useLanguage()
-  const [stage, setStage] = useState<Stage>('INTRO')
-  const [difficulty, setDifficulty] = useState<Difficulty>('basic')
-  const [items, setItems] = useState<GratitudeItems>({ item_1: '', item_2: '', item_3: '' })
+  // 草稿：寫完三件事常常會先按「分享圖片」，iOS 把使用者帶去 IG／LINE，回來時
+  // WKWebView 可能已經被系統回收重載——而存檔要到按「繼續」進入結束頁才發生，
+  // 所以過去整份日記就這樣消失（TestFlight 回饋）。兩小時內回來就接回原本的
+  // 進度；更久沒回來的由 lib/gratitudeDraft 自動存成「僅限本人」。
+  const { session } = Route.useRouteContext()
+  const draftKey = gratitudeDraftKey(session?.user?.id)
+  const [draft] = useState(() => {
+    const loaded = loadGratitudeDraft(draftKey)
+    return loaded && !loaded.isStale ? loaded.draft : null
+  })
+
+  const [stage, setStage] = useState<Stage>(draft?.stage ?? 'INTRO')
+  const [difficulty, setDifficulty] = useState<Difficulty>(draft?.difficulty ?? 'basic')
+  const [items, setItems] = useState<GratitudeItems>(
+    draft?.items ?? { item_1: '', item_2: '', item_3: '' },
+  )
   const [summaryResult, setSummaryResult] = useState<SummaryResult | null>(null)
   const [summaryError, setSummaryError] = useState<string | null>(null)
   const [tags, setTags] = useState<TagResult[]>([])
@@ -237,13 +187,41 @@ function GratitudePage() {
   //  - 內容有改 → 簽章不同 → 重新生成（編輯後重生成）
   //  - 內容沒改（含從結束頁返回查看）→ 簽章相同 → 直接沿用，不重生成
   const lastGenSigRef = useRef<string | null>(null)
-  const [privacy, setPrivacy] = useState<Privacy>(DEFAULT_PRIVACY)
+  const [privacy, setPrivacy] = useState<Privacy>(draft?.privacy ?? DEFAULT_PRIVACY)
   const [savedEntryId, setSavedEntryId] = useState<string | null>(null)
-  const [selectedDate, setSelectedDate] = useState<Date>(todayDate())
+  const [selectedDate, setSelectedDate] = useState<Date>(() =>
+    draft?.entryDate ? parseLocalDate(draft.entryDate) : todayDate(),
+  )
   const [celebrateStreak, setCelebrateStreak] = useState<number | null>(null)
   const [summaryStreak, setSummaryStreak] = useState<number | null>(null)
   const navigate = useNavigate()
   const router = useRouter()
+
+  // 邊寫邊存草稿。只在「還沒寫進資料庫」的階段存：存檔成功後草稿就清掉了
+  // （見 performSave），結束頁也不需要再存。停下來 400ms 才寫，不用每個字都碰
+  // localStorage；離開畫面時（含被系統回收前的最後一次 render）補存一次。
+  const draftStateRef = useRef({ stage, difficulty, items, selectedDate, privacy })
+  draftStateRef.current = { stage, difficulty, items, selectedDate, privacy }
+  const persistDraft = () => {
+    const cur = draftStateRef.current
+    if (savedEntryId) return
+    if (cur.stage !== 'WRITING' && cur.stage !== 'SUMMARY') return
+    if (!hasContent(cur.items)) return
+    saveGratitudeDraft(draftKey, {
+      stage: cur.stage,
+      difficulty: cur.difficulty,
+      items: cur.items,
+      entryDate: isoLocalDate(cur.selectedDate),
+      privacy: cur.privacy,
+    })
+  }
+  const persistRef = useRef(persistDraft)
+  persistRef.current = persistDraft
+  useEffect(() => {
+    const timer = setTimeout(() => persistRef.current(), 400)
+    return () => clearTimeout(timer)
+  }, [stage, difficulty, items, selectedDate, privacy, savedEntryId])
+  useEffect(() => () => persistRef.current(), [])
 
   // 練習內部的 stage 也要能被瀏覽器返回／邊緣滑動手勢／畫面返回鍵一致地「退一層」，
   // 而不是直接跳出整個練習回首頁。INTRO 是最外層，退到這裡後再返回才會真的離開路由。
@@ -346,72 +324,29 @@ function GratitudePage() {
       if (resolvedTags.length > 0) setTags(resolvedTags)
     }
 
-    const t1 = resolvedTags.find((t) => t.item === 1)
-    const t2 = resolvedTags.find((t) => t.item === 2)
-    const t3 = resolvedTags.find((t) => t.item === 3)
-
-    const profileRes = await supabase
-      .from('profiles')
-      .select('name, avatar')
-      .eq('id', userId)
-      .maybeSingle()
-
-    const profileName = profileRes.data?.name ?? null
-    const profileAvatar = profileRes.data?.avatar ?? null
-
-    const fields = privacyToFields(privacy)
-    const anonName = fields.use_real_name
-      ? (profileName || session.user.user_metadata?.full_name || session.user.user_metadata?.name || pickAnonName())
-      : pickAnonName()
-
-    const payload: Record<string, unknown> = {
-      user_id: userId,
-      item_1: items.item_1,
-      item_2: items.item_2,
-      item_3: items.item_3,
-      is_shared: fields.is_shared,
-      use_real_name: fields.use_real_name,
-      entry_date: isoLocalDate(selectedDate),
-      anon_name: anonName,
-    }
-    if (aiFeedback) payload.ai_feedback = aiFeedback
-    if (t1) payload.target_1 = t1.target
-    if (t2) payload.target_2 = t2.target
-    if (t3) payload.target_3 = t3.target
-    // 詞彙標籤（2–4 字，如「同事」）一併存入 tag_1..3，供「一週回顧」的常提到詞彙統計使用
-    if (t1?.label) payload.tag_1 = t1.label
-    if (t2?.label) payload.tag_2 = t2.label
-    if (t3?.label) payload.tag_3 = t3.label
-    if (profileAvatar) payload.avatar = profileAvatar
-
-    const { data: inserted, error } = await supabase
-      .from('gratitude_entries')
-      .insert(payload)
-      .select('id')
-      .single()
-
-    if (error) {
-      console.error('[gratitude save]', error)
-      const msg = error.message || JSON.stringify(error)
+    // 實際寫入（含 profile 查詢、匿名代號、機器人按讚、streak 更新）共用
+    // lib/gratitudeEntry——草稿逾時自動存檔走的是同一條路徑，避免兩邊走鐘。
+    let entryId: string | null
+    try {
+      entryId = await saveGratitudeEntry({
+        userId,
+        items,
+        entryDate: isoLocalDate(selectedDate),
+        privacy,
+        aiFeedback,
+        tags: resolvedTags,
+        realNameFallback:
+          session.user.user_metadata?.full_name ?? session.user.user_metadata?.name ?? null,
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
       alert(t('儲存失敗：{msg}\n\n請截圖回報給工程師。', { msg }))
-      throw new Error(msg)
+      throw err
     }
 
-    const entryId = inserted?.id ?? null
     setSavedEntryId(entryId)
-
-    // 安排機器人按讚（非同步，不阻塞主流程）
-    if (entryId) {
-      void supabase.rpc('schedule_bot_likes', { p_entry_id: entryId })
-    }
-
-    // 計算並更新連續打卡天數（跨練習統一計算，社群顯示才會一致）
-    void (async () => {
-      const streak = await computeUnifiedStreak(userId)
-      await supabase
-        .from('profiles')
-        .upsert({ id: userId, current_streak: streak }, { onConflict: 'id' })
-    })()
+    // 寫進資料庫了，草稿功成身退。
+    clearGratitudeDraft(draftKey)
 
     return entryId
   }

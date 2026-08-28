@@ -112,4 +112,15 @@ export const home: Record<string, Translation> = {
   },
   '安排今天的練習': { 'zh-CN': '安排今天的练习', en: 'Plan Your Practice' },
   '勾選你今天想做的練習': { 'zh-CN': '勾选你今天想做的练习', en: 'Pick the practices you want to do' },
+  // 感恩日記逾時草稿自動存檔的一次性告知（AutoSavedNotice）
+  '{date} 那篇沒送出的感恩日記，已經幫你存起來了': {
+    'zh-CN': '{date} 那篇没送出的感恩日记，已经帮你存起来了',
+    en: 'We saved the gratitude entry you left unfinished on {date}',
+  },
+  '預設「僅限本人」，只有你看得到。想分享到打卡牆的話可以再改。': {
+    'zh-CN': '默认「仅限本人」，只有你看得到。想分享到打卡墙的话可以再改。',
+    en: 'It defaults to private — only you can see it. You can share it to the wall anytime.',
+  },
+  '去看看': { 'zh-CN': '去看看', en: 'Take a look' },
+  '知道了': { 'zh-CN': '知道了', en: 'Got it' },
 }
