@@ -413,7 +413,8 @@ function TodayPracticeBadge({ recommendation }: { recommendation: Recommendation
   return (
     // 外層貼齊視窗兩側、內層 mx-auto max-w-3xl 與其餘頁面內容同一欄位對齊（比照 BottomNav 的做法），
     // 避免畫面比手機版面寬時，浮標貼著瀏覽器邊緣、跟置中的內容欄位對不齊。
-    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(7rem+env(safe-area-inset-bottom))] z-40">
+    // frame-width：網頁版再收窄到手機外框寬度，否則 max-w-3xl（768px）會比外框寬，浮標會飄到外框外面。
+    <div className="frame-width pointer-events-none fixed inset-x-0 bottom-[calc(7rem+env(safe-area-inset-bottom))] z-40">
       <div className="pointer-events-none relative mx-auto max-w-3xl">
         <div className="pointer-events-auto absolute right-4 bottom-0">
           <Link
