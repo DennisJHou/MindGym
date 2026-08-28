@@ -105,13 +105,21 @@ html.native-app [contenteditable='true'] {
    異常巨大。App 版的 header／底部導覽列本身也是 fixed 滿版，不受任何
    容器寬度影響。
 
-   .frame-width：純粹「網頁版收窄到手機寬度並置中」的寬度規則，套在三個
+   .frame-width：純粹「網頁版收窄到手機寬度並置中」的寬度規則，套在四種
    地方——(a) __root.tsx 的 .app-frame（一般頁面內容）、(b) app.tsx 的
-   <header>、(c) app.tsx 的 <nav>（底部導覽列）。三者都是 fixed／一般
-   flow 各自獨立的元素，所以「置中欄寬」這條規則本身也要各自套用，不能
-   只包一層父層外框就好（實測 container-type 並不會讓子孫的 position:
-   fixed 元素改吃這層容器當 containing block，fixed 元素還是相對『真正
-   的瀏覽器視窗』定位，所以 header／底部導覽列必須各自加這個 class）。
+   <header>、(c) app.tsx 的 <nav>（底部導覽列）、(d) 貼著畫面邊緣的
+   position: fixed 浮動元件（側邊選單、角落的語言／靜音浮標）外面再包的
+   那一層 fixed 定位框。四者都是各自獨立的元素，所以「置中欄寬」這條規則
+   本身也要各自套用，不能只包一層父層外框就好。
+
+   (d) 那類浮動元件為什麼不用「right: 外框留白寬度」這種算距離的寫法：
+   fixed 元素的 containing block 不一定是瀏覽器視窗——.app-frame 開了
+   container-type（見下），依規範它就成為子孫 fixed 元素的 containing
+   block，此時「從視窗右緣往左算」的基準整個不同，浮標會跑到外框左邊去。
+   改成外層 fixed + inset-x-0 + .frame-width（max-width + margin auto），
+   不論 containing block 是視窗還是 .app-frame，算出來都落在同一個外框
+   欄位上，再讓內容用 absolute 貼齊這層的邊緣即可。App 版沒有 max-width，
+   這層就是整個螢幕寬，位置與加這層之前完全一致。
 
    只在網頁版套用（selector 要求 html 不能有 native-app class）——
    App 版（含 iPad／橫向）一律不吃這條規則，寬度行為與新增前完全一致。
@@ -128,33 +136,6 @@ html:not(.native-app) .frame-width {
 }
 .app-frame {
   container-type: inline-size;
-}
-
-/* --frame-gutter：外框左右各留的空白寬度。
-   .frame-width 只解決「有寬度的元素要置中」，但貼著畫面邊緣的 position:
-   fixed 浮動元件（側邊選單、角落的語言／靜音浮標）沒有寬度可收，它們是
-   直接吃 right: 0 貼在瀏覽器視窗邊緣——桌面上就會離手機外框好幾百 px，
-   點外框裡的選單鈕、選單卻從視窗最右邊飛出來。這些元件改用
-   right: var(--frame-gutter)（或 calc(var(--frame-gutter) + 原本的邊距)）
-   就會貼齊外框邊緣。
-   App 版恆為 0px，行為與新增前完全一致。 */
-:root {
-  --frame-gutter: 0px;
-}
-html:not(.native-app) {
-  --frame-gutter: max(0px, calc((100vw - 480px) / 2));
-}
-
-/* 側邊選單「收起」時要一併 visibility: hidden——網頁版外框右邊的留白也在
-   畫面上，光靠 translate-x-full 位移，寬螢幕會看到選單停在外框旁邊沒消失。
-   同樣只在網頁版套用：App 版 gutter 為 0，位移出去本來就在畫面外，不需要
-   （也不會）多這道隱藏，動畫與行為跟改動前一模一樣。
-   visibility 要一起放進 transition-property，滑出動畫才會跑完才隱藏。 */
-html:not(.native-app) .frame-drawer {
-  transition-property: transform, visibility;
-}
-html:not(.native-app) .frame-drawer-closed {
-  visibility: hidden;
 }
 
 /* 字體大小設定（無障礙大字模式）。所有 rem 字級會隨 html font-size 一起放大。 */

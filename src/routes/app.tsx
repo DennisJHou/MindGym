@@ -125,96 +125,99 @@ function TopHeader() {
       )}
 
       {/* Side Drawer */}
-      {/* right-[var(--frame-gutter)]：網頁版貼齊手機外框的右緣；App 版 gutter 為 0px，
-          算出來就是原本的 right: 0。frame-drawer／frame-drawer-closed 這兩個 class
-          的規則也只在網頁版生效（詳見 index.css），所以 App 版行為完全沒變。 */}
-      <aside
-        className={`frame-drawer fixed top-0 right-[var(--frame-gutter)] z-50 flex h-full w-[300px] flex-col overflow-y-auto bg-[#FEFAF0] transition-transform duration-300 ${
-          drawerOpen
-            ? 'translate-x-0 shadow-[-10px_0_30px_rgba(40,24,12,0.25)]'
-            : 'frame-drawer-closed translate-x-full'
-        }`}
-      >
-        <div className="flex items-center justify-between px-7 pb-3 pt-[calc(env(safe-area-inset-top)+1.6rem)]">
-          <span className="text-2xl font-black tracking-[0.04em] text-foreground">{t('選單')}</span>
-          <button
-            aria-label={t('關閉選單')}
-            onClick={() => setDrawerOpen(false)}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-2xl leading-none text-foreground hover:bg-[#542916]/5"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="mx-7 h-px bg-[#e3dccd]" />
-
-        <nav className="flex flex-col gap-1 px-5 py-4">
-          <DrawerLink
-            to="/onboarding"
-            search={{ reassess: true }}
-            icon={<ClipboardIcon />}
-            label={t('InMind 心理健康測驗')}
-            onClick={() => setDrawerOpen(false)}
-          />
-          <DrawerExternalLink
-            href="https://line.me/ti/g2/s8BmdrBAelUmNj858hi5iHzhJ-vhTQVCqTSokQ?utm_source=invitation&utm_medium=link_copy&utm_campaign=default"
-            icon={<UsersIcon />}
-            label={t('PSY by PSY 社群')}
-          />
-          <DrawerExternalLink
-            href="https://www.instagram.com/psy_by_psy/"
-            icon={<CameraIcon />}
-            label={t('IG 追蹤我們')}
-          />
-
-          <div className="my-3 h-px bg-[#e3dccd]" />
-
-          {/* 語言切換 */}
-          <LanguageSwitcher />
-
-          <div className="my-3 h-px bg-[#e3dccd]" />
-
-          {/* 字體大小（無障礙大字模式） */}
-          <div className="px-3 py-1">
-            <div className="flex items-center gap-3">
-              <FontSizeIcon />
-              <span className="text-lg font-black tracking-[0.03em] text-foreground">{t('字體大小')}</span>
-            </div>
-            <div className="mt-4 flex items-center gap-3">
-              {FONT_SCALE_OPTIONS.map((opt) => {
-                const active = fontScale === opt.value
-                const sizeClass =
-                  opt.value === 'standard' ? 'text-[15px]' : opt.value === 'large' ? 'text-xl' : 'text-2xl'
-                return (
-                  <button
-                    key={opt.value}
-                    onClick={() => changeFontScale(opt.value)}
-                    aria-pressed={active}
-                    className={`rounded-2xl px-4 py-2.5 font-bold transition active:scale-95 ${sizeClass} ${
-                      active
-                        ? 'border-2 border-[#88B8CE] bg-white text-foreground shadow-soft'
-                        : 'border border-[#d8cdbb] bg-[#e7e0d2] text-muted-foreground'
-                    }`}
-                  >
-                    {t(opt.label)}
-                  </button>
-                )
-              })}
-            </div>
-            <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
-              {t('放大全站文字，方便閱讀。')}
-            </p>
+      {/* 外層 frame-width：把選單收進手機外框的欄位（詳見 index.css 的
+          .frame-width 說明）。overflow-hidden 讓收起時位移出去的選單直接被
+          裁掉，寬螢幕上不會看到它停在外框旁邊。App 版這層就是整個螢幕寬，
+          選單位置與行為跟改動前一模一樣。 */}
+      <div className="frame-width pointer-events-none fixed inset-0 z-50 overflow-hidden">
+        <aside
+          className={`pointer-events-auto absolute inset-y-0 right-0 flex w-[300px] flex-col overflow-y-auto bg-[#FEFAF0] transition-transform duration-300 ${
+            drawerOpen
+              ? 'translate-x-0 shadow-[-10px_0_30px_rgba(40,24,12,0.25)]'
+              : 'translate-x-full'
+          }`}
+        >
+          <div className="flex items-center justify-between px-7 pb-3 pt-[calc(env(safe-area-inset-top)+1.6rem)]">
+            <span className="text-2xl font-black tracking-[0.04em] text-foreground">{t('選單')}</span>
+            <button
+              aria-label={t('關閉選單')}
+              onClick={() => setDrawerOpen(false)}
+              className="flex h-9 w-9 items-center justify-center rounded-full text-2xl leading-none text-foreground hover:bg-[#542916]/5"
+            >
+              ✕
+            </button>
           </div>
 
-          {/* 通知開關：即使先前按過「稍後再說」，也能在這裡隨時開啟 */}
-          <NotificationSetting />
+          <div className="mx-7 h-px bg-[#e3dccd]" />
 
-          <div className="my-3 h-px bg-[#e3dccd]" />
+          <nav className="flex flex-col gap-1 px-5 py-4">
+            <DrawerLink
+              to="/onboarding"
+              search={{ reassess: true }}
+              icon={<ClipboardIcon />}
+              label={t('InMind 心理健康測驗')}
+              onClick={() => setDrawerOpen(false)}
+            />
+            <DrawerExternalLink
+              href="https://line.me/ti/g2/s8BmdrBAelUmNj858hi5iHzhJ-vhTQVCqTSokQ?utm_source=invitation&utm_medium=link_copy&utm_campaign=default"
+              icon={<UsersIcon />}
+              label={t('PSY by PSY 社群')}
+            />
+            <DrawerExternalLink
+              href="https://www.instagram.com/psy_by_psy/"
+              icon={<CameraIcon />}
+              label={t('IG 追蹤我們')}
+            />
 
-          {/* 封鎖名單（社群安全管理）：從個人檔案移至側邊欄 */}
-          <BlockedListSection active={drawerOpen} />
-        </nav>
-      </aside>
+            <div className="my-3 h-px bg-[#e3dccd]" />
+
+            {/* 語言切換 */}
+            <LanguageSwitcher />
+
+            <div className="my-3 h-px bg-[#e3dccd]" />
+
+            {/* 字體大小（無障礙大字模式） */}
+            <div className="px-3 py-1">
+              <div className="flex items-center gap-3">
+                <FontSizeIcon />
+                <span className="text-lg font-black tracking-[0.03em] text-foreground">{t('字體大小')}</span>
+              </div>
+              <div className="mt-4 flex items-center gap-3">
+                {FONT_SCALE_OPTIONS.map((opt) => {
+                  const active = fontScale === opt.value
+                  const sizeClass =
+                    opt.value === 'standard' ? 'text-[15px]' : opt.value === 'large' ? 'text-xl' : 'text-2xl'
+                  return (
+                    <button
+                      key={opt.value}
+                      onClick={() => changeFontScale(opt.value)}
+                      aria-pressed={active}
+                      className={`rounded-2xl px-4 py-2.5 font-bold transition active:scale-95 ${sizeClass} ${
+                        active
+                          ? 'border-2 border-[#88B8CE] bg-white text-foreground shadow-soft'
+                          : 'border border-[#d8cdbb] bg-[#e7e0d2] text-muted-foreground'
+                      }`}
+                    >
+                      {t(opt.label)}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
+                {t('放大全站文字，方便閱讀。')}
+              </p>
+            </div>
+
+            {/* 通知開關：即使先前按過「稍後再說」，也能在這裡隨時開啟 */}
+            <NotificationSetting />
+
+            <div className="my-3 h-px bg-[#e3dccd]" />
+
+            {/* 封鎖名單（社群安全管理）：從個人檔案移至側邊欄 */}
+            <BlockedListSection active={drawerOpen} />
+          </nav>
+        </aside>
+      </div>
     </>
   )
 }

@@ -155,7 +155,11 @@ function LoginPage() {
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-end overflow-x-hidden px-6 pt-12">
-      <LanguageSwitcherCompact className="fixed top-[calc(env(safe-area-inset-top)+1rem)] right-[calc(var(--frame-gutter)+1rem)] z-20" />
+      {/* 外層 frame-width：把語言鈕收進手機外框的欄位（詳見 index.css 的
+          .frame-width 說明）。App 版這層就是整個螢幕寬，位置沒有變。 */}
+      <div className="frame-width pointer-events-none fixed inset-x-0 top-0 z-20">
+        <LanguageSwitcherCompact className="pointer-events-auto absolute right-4 top-[calc(env(safe-area-inset-top)+1rem)]" />
+      </div>
       {inAppNotice && (
         <InAppBrowserNotice
           browser={inAppNotice}
