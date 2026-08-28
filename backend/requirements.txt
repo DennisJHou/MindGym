@@ -2,7 +2,18 @@ fastapi>=0.100.0
 uvicorn[standard]>=0.23.0
 httpx>=0.27.0
 python-dotenv>=1.0.0
-anthropic>=0.49.0
-openai>=1.0.0
+# ⚠️ 上限不能拿掉：anthropic 1.0.0（2026-08-20 發布）把 temperature／top_p／top_k
+# 從 messages.parse() 與 messages.create() 整組移除。Render 每次部署都重新
+# pip install，原本寫 anthropic>=0.49.0 沒有上限，所以任何一次重新部署都會裝到
+# 1.x，InMind 測驗（/api/report，用 parse(temperature=0.2)）當場丟
+# TypeError: AsyncMessages.parse() got an unexpected keyword argument 'temperature'
+# ——使用者看到的是「分析失敗」，但金鑰、額度、網路都是好的。
+# 0.x 最後一版 0.125.0（2026-08-19，1.0.0 前一天）仍有這些參數，這個範圍會裝到它。
+# 要升到 1.x 是另一件事：得先把兩處 temperature=0.2（app.py 的 /api/report 與
+# pro-review）改掉再一起上，不要只放寬這行。
+anthropic>=0.116.0,<1.0
+# 同理加上限：openai 目前最新是 3.x，這裡用到的 audio.transcriptions.create
+# 在 3.x 仍相容（已驗證），但主版本升級一律要人看過再放行。
+openai>=1.0.0,<4
 slowapi>=0.1.9
 python-multipart>=0.0.9
