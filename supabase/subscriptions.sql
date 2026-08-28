@@ -361,3 +361,68 @@ BEGIN
          updated_at = now()
    WHERE id = 1;
 END; $$;
+
+-- ============================================================
+-- 9. 社群封頂區塊與創始成員徽章
+-- ============================================================
+
+-- 未解鎖者滑到底時顯示「還有 N 則故事你還沒看到」用的總數。
+--
+-- ⚠️ 為什麼需要這支函式：未解鎖者被 RLS 擋著，自己下 count 查詢只會拿到
+--    預覽的那幾筆，數不出真實總數。這裡用 SECURITY DEFINER 繞過 policy 只回
+--    「一個數字」——不洩漏任何貼文內容，但足以誠實告訴使用者還有多少沒看到。
+--
+-- 篩選條件與前端動態牆一致（排除工作坊貼文，它們在另一個分頁聚合）。
+CREATE OR REPLACE FUNCTION community_shared_total() RETURNS integer
+LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
+  SELECT count(*)::int FROM gratitude_entries
+  WHERE is_shared = true
+    AND (practice_type IS NULL
+         OR practice_type NOT IN ('workshop_authentic_self', 'workshop_last_day', 'workshop_woop'))
+$$;
+
+-- 創始成員的 user_id 清單，供社群貼文掛「創始成員」徽章。
+--
+-- 這是「公開徽章」的資料來源，所以刻意開放給所有登入者讀取——
+-- subscriptions 表本身的 RLS 只允許本人與 admin 讀，一般使用者看不到別人的
+-- 訂閱層級；這支函式只回傳「誰是創始成員」這一項，不洩漏 tier／狀態／到期日。
+-- 名額上限 500，全量回傳成本很低，前端抓一次建成 Set 即可。
+CREATE OR REPLACE FUNCTION founding_member_user_ids() RETURNS SETOF uuid
+LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
+  SELECT user_id FROM subscriptions WHERE is_founding_member = true
+$$;
+
+-- /admin →「訂閱管理」用：列出創始成員申請（付費牆 CTA 的點擊紀錄）。
+-- 帶出申請者目前是否已核准（is_founding_member），讓後台能一眼看出待處理的。
+CREATE OR REPLACE FUNCTION admin_list_paywall_intents(p_limit integer DEFAULT 100)
+RETURNS TABLE (
+  id uuid, user_id uuid, name text, email text,
+  plan_code text, source text, created_at timestamptz,
+  is_founding_member boolean, tier text
+) LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public AS $$
+BEGIN
+  IF NOT is_admin(auth.uid()) THEN RAISE EXCEPTION '僅限管理員操作'; END IF;
+  RETURN QUERY
+    SELECT i.id, i.user_id, p.name, u.email::text,
+           i.plan_code, i.source, i.created_at,
+           COALESCE(s.is_founding_member, false), COALESCE(s.tier, 'free')
+    FROM paywall_intents i
+    JOIN profiles p ON p.id = i.user_id
+    JOIN auth.users u ON u.id = i.user_id
+    LEFT JOIN subscriptions s ON s.user_id = i.user_id
+    ORDER BY i.created_at DESC
+    LIMIT p_limit;
+END; $$;
+
+-- 待處理的申請數（後台分頁上的紅點數字）：申請過、但還沒被設為創始成員的人數。
+CREATE OR REPLACE FUNCTION admin_pending_intent_count() RETURNS integer
+LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public AS $$
+BEGIN
+  IF NOT is_admin(auth.uid()) THEN RAISE EXCEPTION '僅限管理員操作'; END IF;
+  RETURN (
+    SELECT count(DISTINCT i.user_id)::int
+    FROM paywall_intents i
+    LEFT JOIN subscriptions s ON s.user_id = i.user_id
+    WHERE COALESCE(s.is_founding_member, false) = false
+  );
+END; $$;
