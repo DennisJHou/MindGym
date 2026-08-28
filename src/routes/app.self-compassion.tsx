@@ -515,13 +515,17 @@ function MeditationToggle() {
 
   return (
     <>
-      <button
-        onClick={toggleMute}
-        className="fixed right-[calc(var(--frame-gutter)+1.25rem)] top-[calc(env(safe-area-inset-top)+4.5rem)] z-40 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary shadow-soft transition active:scale-90"
-        aria-label={muted ? t('開啟音樂聲音') : t('關閉音樂聲音')}
-      >
-        {muted ? <MusicMutedIcon /> : <MusicNoteIcon />}
-      </button>
+      {/* 外層 frame-width：把浮標收進手機外框的欄位（詳見 index.css 的
+          .frame-width 說明）。App 版這層就是整個螢幕寬，位置沒有變。 */}
+      <div className="frame-width pointer-events-none fixed inset-x-0 top-0 z-40">
+        <button
+          onClick={toggleMute}
+          className="pointer-events-auto absolute right-5 top-[calc(env(safe-area-inset-top)+4.5rem)] flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary shadow-soft transition active:scale-90"
+          aria-label={muted ? t('開啟音樂聲音') : t('關閉音樂聲音')}
+        >
+          {muted ? <MusicMutedIcon /> : <MusicNoteIcon />}
+        </button>
+      </div>
       <iframe
         ref={iframeRef}
         onLoad={handleLoad}
