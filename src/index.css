@@ -138,6 +138,30 @@ html:not(.native-app) .frame-width {
   container-type: inline-size;
 }
 
+/* ── InMind 測驗版面：把輸入框釘在鍵盤上方 ──────────────────────────
+   --keyboard-height 由 lib/keyboard.ts 維護（原生走 Capacitor Keyboard 事件，
+   網頁走 visualViewport）。iOS 殼刻意設 Keyboard.resize: 'none'，鍵盤是「蓋」
+   在 WebView 上、不會縮小視窗高度，所以要自己把畫面高度減掉鍵盤那一段，
+   測驗畫面才會整個縮進鍵盤上方。
+
+   配合 QuestionnaireScreen 內部「上半可捲動、下半固定」的切法，使用者打字時
+   一定看得到自己輸入的內容與「下一題」按鈕（TestFlight 回饋：鍵盤擋住輸入框、
+   看不到打了什麼）。第一行 100vh 是給不支援 dvh 的舊 iOS 的 fallback。 */
+.quiz-screen {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+/* 鍵盤收起時維持原本的整頁捲動（版面與過去一致）；只有鍵盤真的佔著畫面時，
+   才把整個測驗鎖進「可視區減掉鍵盤」的高度裡，內部自己分配空間。 */
+.quiz-screen.is-keyboard {
+  min-height: 0;
+  height: calc(100vh - var(--keyboard-height, 0px));
+  height: calc(100dvh - var(--keyboard-height, 0px));
+  overflow: hidden;
+}
+
 /* 字體大小設定（無障礙大字模式）。所有 rem 字級會隨 html font-size 一起放大。 */
 html {
   font-size: 16px;

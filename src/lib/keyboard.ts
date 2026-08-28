@@ -1,6 +1,37 @@
-import { useEffect } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { Keyboard } from '@capacitor/keyboard'
+
+// ── 鍵盤高度：CSS 變數 + React 訂閱 ────────────────────────────────────
+// 版面同時需要兩種形式：CSS 用 --keyboard-height 算高度，元件則要知道「鍵盤
+// 開著沒」才能收起裝飾（不能只看輸入框 focus——iOS 上鍵盤還開著、focus 卻已
+// 經掉了的狀態確實會發生，這時若還照「沒在打字」的版面排，按鈕會被裁掉）。
+let keyboardHeight = 0
+const keyboardListeners = new Set<() => void>()
+
+function setKeyboardHeight(next: number) {
+  const value = Math.max(0, Math.round(next))
+  if (value === keyboardHeight) return
+  keyboardHeight = value
+  document.documentElement.style.setProperty('--keyboard-height', `${value}px`)
+  keyboardListeners.forEach((fn) => fn())
+}
+
+function subscribeKeyboard(fn: () => void) {
+  keyboardListeners.add(fn)
+  return () => {
+    keyboardListeners.delete(fn)
+  }
+}
+
+/** 目前鍵盤高度（px）；沒有鍵盤／桌機恆為 0。 */
+export function useKeyboardHeight(): number {
+  return useSyncExternalStore(
+    subscribeKeyboard,
+    () => keyboardHeight,
+    () => 0,
+  )
+}
 
 const FORM_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT'])
 const SCROLL_MARGIN = 16 // px breathing room above keyboard
@@ -46,19 +77,54 @@ function scrollActiveIntoView(keyboardHeight: number) {
   }
 }
 
+// 「點空白處收鍵盤」只認真正的『點一下』：按下與放開要在同一個位置附近、
+// 而且夠短。用 pointerdown 直接收鍵盤的話，使用者想『把頁面往上滑一點、看
+// 自己打了什麼』時，手指一按下去鍵盤就收掉，等於根本沒辦法邊打字邊捲動
+// （TestFlight 回饋：要一直收鍵盤開鍵盤）。
+const TAP_MOVE_TOLERANCE = 10 // px
+const TAP_MAX_DURATION = 600 // ms
+
 export function useGlobalKeyboard(): void {
-  // [2] 點輸入框外的任何空白處 → 自動收起鍵盤
+  // [2] 點輸入框外的任何空白處 → 自動收起鍵盤（捲動手勢不算）
   useEffect(() => {
+    let start: { x: number; y: number; time: number } | null = null
+
+    const isDismissTarget = (target: Element | null) =>
+      !target?.closest('input, textarea, select, [contenteditable="true"], button, a, label')
+
     const onPointerDown = (e: PointerEvent) => {
+      if (!isFormField(document.activeElement)) return
+      if (!isDismissTarget(e.target as Element | null)) return
+      start = { x: e.clientX, y: e.clientY, time: Date.now() }
+    }
+
+    const onPointerUp = (e: PointerEvent) => {
+      const down = start
+      start = null
+      if (!down) return
       const active = document.activeElement
       if (!isFormField(active)) return
-      const target = e.target as Element | null
-      if (target?.closest('input, textarea, select, [contenteditable="true"], button, a, label')) return
+      if (!isDismissTarget(e.target as Element | null)) return
+      // 手指有移動＝捲動／滑動，不是點擊 → 鍵盤留著
+      if (Math.abs(e.clientX - down.x) > TAP_MOVE_TOLERANCE) return
+      if (Math.abs(e.clientY - down.y) > TAP_MOVE_TOLERANCE) return
+      if (Date.now() - down.time > TAP_MAX_DURATION) return
       ;(active as HTMLElement).blur()
       if (Capacitor.isNativePlatform()) void Keyboard.hide()
     }
+
+    const onPointerCancel = () => {
+      start = null
+    }
+
     document.addEventListener('pointerdown', onPointerDown, true)
-    return () => document.removeEventListener('pointerdown', onPointerDown, true)
+    document.addEventListener('pointerup', onPointerUp, true)
+    document.addEventListener('pointercancel', onPointerCancel, true)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true)
+      document.removeEventListener('pointerup', onPointerUp, true)
+      document.removeEventListener('pointercancel', onPointerCancel, true)
+    }
   }, [])
 
   // [5] 原生：管理 --keyboard-height，並在鍵盤完全展開後捲動到輸入框
@@ -67,8 +133,7 @@ export function useGlobalKeyboard(): void {
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
     const subs: { remove: () => void }[] = []
-    const setH = (h: number) =>
-      document.documentElement.style.setProperty('--keyboard-height', `${h}px`)
+    const setH = setKeyboardHeight
 
     void Keyboard.addListener('keyboardWillShow', (info) => setH(info.keyboardHeight ?? 0)).then((s) => subs.push(s))
     void Keyboard.addListener('keyboardDidShow', (info) => {
@@ -81,19 +146,48 @@ export function useGlobalKeyboard(): void {
 
     return () => {
       subs.forEach((s) => s.remove())
-      document.documentElement.style.setProperty('--keyboard-height', '0px')
+      setKeyboardHeight(0)
     }
   }, [])
 
-  // [5] 網頁（非原生）：focusin 後捲動（無鍵盤高度可取，只補上邊界）
+  // [5] 網頁（非原生）：沒有 Keyboard plugin，改用 visualViewport 推算鍵盤高度，
+  // 讓 --keyboard-height 在手機瀏覽器也有值——測驗頁的版面靠這個變數把輸入框
+  // 留在鍵盤上方（見 QuestionnaireScreen），不然網頁版一樣會被鍵盤蓋住。
+  // 桌機沒有虛擬鍵盤，算出來恆為 0，行為與過去一致。
   useEffect(() => {
     if (Capacitor.isNativePlatform()) return
+    const vv = window.visualViewport
+    const setH = setKeyboardHeight
+
+    const sync = () => {
+      if (!vv) return
+      // 使用者放大縮放時視覺視窗也會變小，那不是鍵盤，別誤判。
+      if (vv.scale > 1.05) return
+      // 視覺視窗被鍵盤蓋掉的那一段（含捲動偏移）。留 60px 門檻濾掉網址列收合。
+      const covered = window.innerHeight - vv.height - vv.offsetTop
+      setH(covered > 60 ? covered : 0)
+    }
+
+    vv?.addEventListener('resize', sync)
+    vv?.addEventListener('scroll', sync)
+    sync()
+
     const onFocusIn = (e: FocusEvent) => {
       const t = e.target as Element | null
       if (!isFormField(t)) return
-      setTimeout(() => scrollActiveIntoView(0), 120)
+      // 等鍵盤動畫與版面重繪完成，再用當下的鍵盤高度捲動
+      setTimeout(() => {
+        sync()
+        scrollActiveIntoView(keyboardHeight)
+      }, 250)
     }
     document.addEventListener('focusin', onFocusIn)
-    return () => document.removeEventListener('focusin', onFocusIn)
+
+    return () => {
+      vv?.removeEventListener('resize', sync)
+      vv?.removeEventListener('scroll', sync)
+      document.removeEventListener('focusin', onFocusIn)
+      setH(0)
+    }
   }, [])
 }

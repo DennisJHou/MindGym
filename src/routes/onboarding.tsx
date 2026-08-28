@@ -12,6 +12,7 @@ import { markOnboardingSkipped } from '../lib/onboardingSkip'
 import { useLanguage } from '../lib/i18n/context'
 import { LanguageSwitcherCompact } from '../components/LanguageSwitcher'
 import { useGlobalKeyboard } from '../lib/keyboard'
+import { clearQuizDraft, loadQuizDraft, quizDraftKey, saveQuizDraft } from '../lib/quizDraft'
 import { PaywallScreen } from '../components/paywall/PaywallScreen'
 
 // ── Route ─────────────────────────────────────────────────────────────────
@@ -186,7 +187,15 @@ function AlertIcon() {
   )
 }
 
-function ErrorScreen({ isTimeout, onRetry }: { isTimeout: boolean; onRetry: () => void }) {
+function ErrorScreen({
+  isTimeout,
+  onRetry,
+  onBackToAnswers,
+}: {
+  isTimeout: boolean
+  onRetry: () => void
+  onBackToAnswers: () => void
+}) {
   const { t } = useLanguage()
   return (
     <div
@@ -236,6 +245,27 @@ function ErrorScreen({ isTimeout, onRetry }: { isTimeout: boolean; onRetry: () =
       >
         {t('重新嘗試')}
       </button>
+      {/* 失敗最讓人心痛的不是重試，是以為五題白填了。這裡明講答案還在，
+          並且留一個「回去看答案」的出口（回到最後一題，可前後翻閱修改）。 */}
+      <button
+        onClick={onBackToAnswers}
+        style={{
+          marginTop: 14,
+          background: 'transparent',
+          color: '#666',
+          border: 'none',
+          padding: '8px 12px',
+          fontSize: 13.5,
+          fontWeight: 600,
+          cursor: 'pointer',
+          textDecoration: 'underline',
+        }}
+      >
+        {t('回去看我的答案')}
+      </button>
+      <div style={{ marginTop: 16, fontSize: 12.5, color: '#959595', maxWidth: 280, lineHeight: 1.6 }}>
+        {t('你剛剛填的內容都已經保留，重試不會清空。')}
+      </div>
     </div>
   )
 }
@@ -254,8 +284,15 @@ function OnboardingPage() {
   const { latestReport } = Route.useLoaderData()
   const navigate = useNavigate()
 
+  // 測驗草稿：作答只放在 React state 的話，AI 失敗後返回、App 被系統回收或
+  // WebView 重載，五題長文就全沒了。改成隨打隨存 localStorage（見 lib/quizDraft）。
+  const draftKey = quizDraftKey(session?.user?.id)
+  const [draft] = useState(() => loadQuizDraft(draftKey))
+
   const [screen, setScreen] = useState<InMindScreen>(showResult && latestReport ? 'report' : 'intro')
-  const [answers, setAnswers] = useState<NarrativeAnswers>({ P: '', E: '', R: '', M: '', A: '' })
+  const [answers, setAnswers] = useState<NarrativeAnswers>(
+    draft?.answers ?? { P: '', E: '', R: '', M: '', A: '' },
+  )
   const [report, setReport] = useState<InMindReport | null>(latestReport ?? null)
   const [apiError, setApiError] = useState('')
   const [isTimeoutError, setIsTimeoutError] = useState(false)
@@ -293,6 +330,7 @@ function OnboardingPage() {
       if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`)
       setReport(data)
       setScreen('report')
+      clearQuizDraft(draftKey)
       track('quiz_completed', {
         reassess: Boolean(reassess),
         total_score: data.total_score,
@@ -346,6 +384,7 @@ function OnboardingPage() {
       <ErrorScreen
         isTimeout={isTimeoutError}
         onRetry={() => handleSubmit(answers)}
+        onBackToAnswers={() => setScreen('quiz')}
       />
     )
   } else if (screen === 'report' && report) {
@@ -353,6 +392,7 @@ function OnboardingPage() {
       <InMindReportPage
         report={report}
         onRestart={() => {
+          clearQuizDraft(draftKey)
           setAnswers({ P: '', E: '', R: '', M: '', A: '' })
           setReport(null)
           setScreen('intro')
@@ -366,9 +406,15 @@ function OnboardingPage() {
     content = (
       <NarrativeQuiz
         initialAnswers={answers}
+        initialStep={draft?.step ?? 0}
         startAtLast={apiError !== ''}
         apiError={apiError}
         onSubmit={handleSubmit}
+        onDraftChange={(next) => {
+          // 父層也同步一份，錯誤畫面的「重新嘗試」才會送出最新的作答。
+          setAnswers(next.answers)
+          saveQuizDraft(draftKey, next)
+        }}
         onExit={triggerBack}
       />
     )
