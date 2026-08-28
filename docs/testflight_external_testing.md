@@ -17,8 +17,10 @@ PSY by PSY 是一款心理練習與正向習慣養成 App，包含每日感恩�
 
 ### Feedback Email（測試回饋寄到哪）
 
+> 支援多組信箱，用逗號分隔；在 App Store Connect → TestFlight → 測試資訊 填入才會生效。
+
 ```
-love2002yy@gmail.com
+ongcien@gmail.com, yolanda921223@gmail.com, zengmaterial@gmail.com, psybypsy01@gmail.com, love2002yy@gmail.com
 ```
 
 ### What to Test（這個版本要測什麼，每次上傳可更新）
