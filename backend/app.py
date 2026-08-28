@@ -649,7 +649,21 @@ def compute_percentile(total: float) -> dict:
 
 @app.get("/healthz")
 async def health():
-    return {"ok": True}
+    """健康檢查，順便回報線上「實際跑的是哪一版」。
+
+    加這幾個欄位的理由（2026-08-28 的教訓）：anthropic 1.0.0 移除了
+    temperature 參數，Render 因為 requirements 沒鎖上限而自動裝到新版，
+    InMind 測驗整個掛掉。當時要判斷「線上到底裝到哪一版」，只能一版一版
+    裝起來比對函式簽章——因為線上完全沒有版本資訊，而且不是每個人都有
+    Render 後台權限。有這個端點，一行 curl 就知道。
+    """
+    return {
+        "ok": True,
+        "anthropic": anthropic.__version__,
+        "openai": openai.__version__,
+        # Render 會把部署的 commit 放進這個環境變數；本機跑就沒有。
+        "commit": (os.getenv("RENDER_GIT_COMMIT") or "local")[:7],
+    }
 
 
 @app.post("/api/tag-gratitude-targets")
