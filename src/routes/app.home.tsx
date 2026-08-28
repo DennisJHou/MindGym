@@ -9,6 +9,7 @@ import { checkAndGenerateReviews } from '../lib/reviews'
 import { isoLocalDate } from '../lib/date'
 import { ProModuleSection } from '../components/pro/ProModuleSection'
 import { WoopReminderCard } from '../components/WoopReminderCard'
+import { AutoSavedNotice } from '../components/AutoSavedNotice'
 import { useLanguage } from '../lib/i18n/context'
 import homeMascot from '../assets/ui/home-mascot.png'
 import gratitudeMascot from '../assets/ui/gratitude-mascot.png'
@@ -188,6 +189,9 @@ function HomePage() {
           {t('{name}，今天想練哪塊心理肌肉？', { name: userName })}
         </h1>
       </div>
+
+      {/* 感恩日記逾時草稿被自動存檔時的一次性告知（見 AutoSavedNotice）。 */}
+      <AutoSavedNotice userId={userId} />
 
       {/* 你今天的 If-Then（有設定今天的 WOOP 才會出現）：使用者對自己的承諾，
           排在標題正下方、跑馬燈之前，比任何系統推薦都優先。 */}
