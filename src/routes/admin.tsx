@@ -806,18 +806,39 @@ const TIER_OPTIONS = [
 
 const STATUS_OPTIONS = ['active', 'trialing', 'grace', 'canceled', 'expired']
 
+// 創始成員申請（付費牆 CTA 的點擊紀錄）。
+type IntentRow = {
+  id: string
+  user_id: string
+  name: string | null
+  email: string | null
+  plan_code: string
+  source: string | null
+  created_at: string
+  is_founding_member: boolean
+  tier: string
+}
+
 function SubscriptionsTab() {
   const { t } = useLanguage()
   const [query, setQuery] = useState('')
   const [rows, setRows] = useState<SubscriptionRow[] | null>(null)
   const [seats, setSeats] = useState<{ remaining: number; total: number } | null>(null)
+  const [intents, setIntents] = useState<IntentRow[] | null>(null)
 
   const load = useCallback(async (q: string) => {
-    const [searchRes, seatsRes, cfgRes] = await Promise.all([
+    const [searchRes, seatsRes, cfgRes, intentRes] = await Promise.all([
       supabase.rpc('admin_search_subscriptions', { p_query: q }),
       supabase.rpc('founding_seats_remaining'),
       supabase.from('paywall_config').select('founding_quota_total').eq('id', 1).maybeSingle(),
+      supabase.rpc('admin_list_paywall_intents', { p_limit: 100 }),
     ])
+    if (intentRes.error) {
+      console.error('[admin_list_paywall_intents]', intentRes.error)
+      setIntents([])
+    } else {
+      setIntents((intentRes.data as IntentRow[]) ?? [])
+    }
     if (searchRes.error) {
       console.error('[admin_search_subscriptions]', searchRes.error)
       setRows([])
@@ -843,6 +864,9 @@ function SubscriptionsTab() {
         </p>
       )}
 
+      {/* 創始成員申請：付費牆 CTA 的點擊紀錄，待核准的排在最前面 */}
+      <IntentInbox intents={intents} onApproved={() => load(query.trim())} />
+
       <div className="mb-4 flex gap-2">
         <input
           value={query}
@@ -867,6 +891,85 @@ function SubscriptionsTab() {
         <div className="flex flex-col gap-3">
           {rows.map((r) => (
             <SubscriptionCard key={r.user_id} row={r} onSaved={() => load(query.trim())} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function IntentInbox({ intents, onApproved }: { intents: IntentRow[] | null; onApproved: () => Promise<void> }) {
+  const { t } = useLanguage()
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  if (intents === null) return null
+
+  // 同一個人可能按過多次 CTA，只留每人最新那筆，避免收件匣被重複紀錄洗版。
+  const latestByUser = new Map<string, IntentRow>()
+  for (const i of intents) if (!latestByUser.has(i.user_id)) latestByUser.set(i.user_id, i)
+  const unique = [...latestByUser.values()]
+  const pending = unique.filter((i) => !i.is_founding_member)
+
+  const approve = async (row: IntentRow) => {
+    setBusyId(row.id)
+    // 核准 = 設為創始成員 + 升級為 Pro，貼文上的「創始成員」徽章隨即出現。
+    const { error } = await supabase.rpc('set_user_subscription', {
+      p_user_id: row.user_id,
+      p_tier: 'pro',
+      p_status: 'active',
+      p_is_founding: true,
+      p_price_plan_code: row.plan_code,
+      p_expires_at: null,
+      p_note: '創始成員申請核准',
+    })
+    setBusyId(null)
+    if (error) {
+      console.error('[approve founding member]', error)
+      return
+    }
+    await onApproved()
+  }
+
+  return (
+    <div className="mb-5 rounded-2xl border border-border bg-card p-4 shadow-soft">
+      <div className="mb-3 flex items-center gap-2">
+        <h2 className="text-[15px] font-black text-foreground">{t('創始成員申請')}</h2>
+        {pending.length > 0 && (
+          <span className="rounded-full bg-rust px-2 py-0.5 text-[11px] font-extrabold text-white">
+            {t('待處理 {n} 筆', { n: pending.length })}
+          </span>
+        )}
+      </div>
+
+      {unique.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{t('目前沒有新的申請')}</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {/* 待核准的排前面，核准過的留著當紀錄 */}
+          {[...pending, ...unique.filter((i) => i.is_founding_member)].map((row) => (
+            <div key={row.id} className="flex flex-wrap items-center gap-2 rounded-xl bg-background px-3 py-2">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-foreground">{row.name || row.email}</p>
+                <p className="truncate text-[11px] text-muted-foreground">
+                  {row.plan_code === 'pro_yearly' ? t('年繳') : t('月繳')}
+                  {' · '}
+                  {new Date(row.created_at).toLocaleDateString('zh-TW')}
+                </p>
+              </div>
+              {row.is_founding_member ? (
+                <span className="shrink-0 rounded-full bg-tile-mint px-2.5 py-1 text-[11px] font-extrabold text-foreground">
+                  {t('已核准')}
+                </span>
+              ) : (
+                <button
+                  onClick={() => void approve(row)}
+                  disabled={busyId === row.id}
+                  className="shrink-0 rounded-full bg-gradient-primary px-3 py-1.5 text-xs font-extrabold text-primary-foreground shadow-soft transition active:scale-95 disabled:opacity-40"
+                >
+                  {busyId === row.id ? t('儲存中…') : t('核准為創始成員')}
+                </button>
+              )}
+            </div>
           ))}
         </div>
       )}

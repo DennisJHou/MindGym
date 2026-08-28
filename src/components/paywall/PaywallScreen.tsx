@@ -225,13 +225,14 @@ export function PaywallScreen({ source, scores: scoresProp, onDismiss }: Paywall
             disabled={!selected || submitting}
             className="flex h-14 w-full items-center justify-center rounded-full bg-gradient-primary text-base font-extrabold tracking-wide text-primary-foreground shadow-soft transition active:scale-[0.98] disabled:opacity-50"
           >
-            {t('開始 14 天免費體驗')}
+            {t('申請加入創始成員')}
           </button>
 
-          {/* 6. 條款行：試用長度、到期後金額、隨時可取消（規格 §5.1.6） */}
+          {/* 6. 條款行：說明未來的收費方式。目前尚未接金流，所以不寫「到期後扣款」
+                 這種還不存在的行為，只誠實預告開放訂閱後的價格。 */}
           {selected && (
             <p className="mt-2.5 text-center text-[11px] leading-relaxed text-muted-foreground">
-              {t('14 天免費體驗，到期後 {price}，隨時可取消。', {
+              {t('開放訂閱後為 {price}，屆時會先通知你，不會自動扣款。', {
                 price:
                   formatAmount(effectiveAmountCents(selected, useFounding), selected.currency) +
                   (selected.period === 'year' ? t('／年') : t('／月')),

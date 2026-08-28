@@ -31,7 +31,39 @@ export const paywall: Record<string, Translation> = {
   '／年': { 'zh-CN': '／年', en: '/year' },
   '／月': { 'zh-CN': '／月', en: '/month' },
   '創始會員・剩 {n} 位': { 'zh-CN': '创始会员・剩 {n} 位', en: 'Founding member · {n} left' },
-  '開始 14 天免費體驗': { 'zh-CN': '开始 14 天免费体验', en: 'Start your 14-day free trial' },
+  '申請加入創始成員': { 'zh-CN': '申请加入创始成员', en: 'Apply to be a founding member' },
+  '開放訂閱後為 {price}，屆時會先通知你，不會自動扣款。': {
+    'zh-CN': '开放订阅后为 {price}，届时会先通知你，不会自动扣款。',
+    en: 'It will be {price} once subscriptions open. We’ll let you know first — nothing is charged automatically.',
+  },
+
+  // 社群封頂區塊（免費會員滑到預覽上限）
+  '還有 {n} 則故事你還沒看到': {
+    'zh-CN': '还有 {n} 则故事你还没看到',
+    en: '{n} more stories you haven’t seen',
+  },
+  '這週分享 1 則你的紀錄，就能免費看完；或加入創始成員，隨時都能看。': {
+    'zh-CN': '这周分享 1 则你的记录，就能免费看完；或加入创始成员，随时都能看。',
+    en: 'Share one entry this week to see them all for free — or join as a founding member for unlimited access.',
+  },
+  '現在解鎖，馬上繼續看': { 'zh-CN': '现在解锁，马上继续看', en: 'Unlock now and keep reading' },
+  '先去寫一則，免費解鎖這週': {
+    'zh-CN': '先去写一则，免费解锁这周',
+    en: 'Write one entry to unlock this week for free',
+  },
+
+  // 創始成員徽章（後台核准後顯示在貼文上）
+  '創始成員': { 'zh-CN': '创始成员', en: 'Founding member' },
+
+  // /admin 創始成員申請
+  '創始成員申請': { 'zh-CN': '创始成员申请', en: 'Founding member applications' },
+  '待處理 {n} 筆': { 'zh-CN': '待处理 {n} 笔', en: '{n} pending' },
+  '目前沒有新的申請': { 'zh-CN': '目前没有新的申请', en: 'No new applications' },
+  '已核准': { 'zh-CN': '已核准', en: 'Approved' },
+  '待核准': { 'zh-CN': '待核准', en: 'Pending' },
+  '核准為創始成員': { 'zh-CN': '批准为创始成员', en: 'Approve as founding member' },
+  '年繳': { 'zh-CN': '年缴', en: 'Yearly' },
+  '月繳': { 'zh-CN': '月缴', en: 'Monthly' },
   '先自己逛逛': { 'zh-CN': '先自己逛逛', en: 'Just look around first' },
   '恢復購買': { 'zh-CN': '恢复购买', en: 'Restore purchase' },
   '14 天免費體驗，到期後 {price}，隨時可取消。': {

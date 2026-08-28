@@ -17,6 +17,7 @@ import { useLanguage } from '../lib/i18n/context'
 import { translateTexts, type TranslateTargetLang } from '../lib/translate'
 import { fetchEntitlements } from '../lib/entitlements'
 import { CommunityUnlockBanner } from '../components/paywall/CommunityUnlockBanner'
+import { CommunityLockedFooter } from '../components/paywall/CommunityLockedFooter'
 import avatar1 from '../assets/ui/avatar-1.png'
 import avatar2 from '../assets/ui/avatar-2.png'
 import avatar3 from '../assets/ui/頭像1 Bouba脫帽禮.png'
@@ -35,6 +36,8 @@ type GratitudeEntry = {
   entry_date: string | null
   avatar: string | null
   current_streak: number | null
+  /** 作者是否為創始成員（後台核准後掛徽章）。由 founding_member_user_ids() 標上。 */
+  is_founding_member?: boolean
   target_1: string | null
   target_2: string | null
   target_3: string | null
@@ -377,9 +380,23 @@ export const Route = createFileRoute('/app/community')({
     return out
   },
   loader: async () => {
-    // 「貢獻換觀看」：先問伺服器這個人本週解鎖了沒，再決定要撈全部還是預覽 3 則。
+    // 「貢獻換觀看」：先問伺服器這個人本週解鎖了沒，再決定要撈全部還是只撈預覽。
     const entitlements = await fetchEntitlements(true)
     const unlocked = entitlements.community.unlocked
+
+    // 未解鎖時要在封頂區塊誠實告知「還有幾則沒看到」。這個數字一定要跟伺服器要——
+    // 未解鎖者被 RLS 擋著，自己 count 只會數到預覽的那幾筆。
+    const sharedTotalRes = unlocked ? null : await supabase.rpc('community_shared_total')
+    const sharedTotal = (sharedTotalRes?.data as number | null) ?? null
+
+    // 創始成員徽章：名額上限 500，一次全撈建成 Set，比每則貼文各查一次便宜得多。
+    // 這支 RPC 只回「誰是創始成員」，不洩漏 tier／到期日等訂閱細節。
+    const foundingRes = await supabase.rpc('founding_member_user_ids')
+    const foundingIds: string[] = Array.isArray(foundingRes.data)
+      ? (foundingRes.data as unknown[]).map((r) =>
+          typeof r === 'string' ? r : String((r as { founding_member_user_ids?: string })?.founding_member_user_ids ?? ''),
+        ).filter(Boolean)
+      : []
 
     // 只載第一批社群動態（其餘往下滑再向後端要）。
     const [entries, workshopEntriesRaw, sessionRes] = await Promise.all([
@@ -432,6 +449,8 @@ export const Route = createFileRoute('/app/community')({
         communityHasMore,
         myHasMore,
         entitlements,
+        sharedTotal,
+        foundingIds,
         likes: {} as Record<string, LikeInfo>,
         comments: {} as Record<string, Comment[]>,
         commentLikes: {} as Record<string, LikeInfo>,
@@ -463,6 +482,8 @@ export const Route = createFileRoute('/app/community')({
       communityHasMore,
       myHasMore,
       entitlements,
+      sharedTotal,
+      foundingIds,
       ...supporting,
       anonName,
       userId,
@@ -973,6 +994,12 @@ function CommunityPage() {
 
   // 「貢獻換觀看」狀態，由 loader 向伺服器問來（真正的把關在 RLS，這裡只影響顯示）。
   const entitlements = loaderData.entitlements ?? null
+  const sharedTotal = loaderData.sharedTotal ?? null
+  // 創始成員 id 集合，用來替貼文掛徽章。
+  const foundingSet = useMemo(
+    () => new Set(loaderData.foundingIds ?? []),
+    [loaderData.foundingIds],
+  )
 
   // 社群動態 / 我的貼文：往下滑時一批批向後端要（規格 1、2）。
   const [communityFeed, setCommunityFeed] = useState<GratitudeEntry[]>(loaderData.entries)
@@ -1168,8 +1195,22 @@ function CommunityPage() {
     return () => observer.disconnect()
   }, [mode, selectedWorkshop, selectedWorkshopEntries.length])
 
-  const visibleEntries = orderedEntries.filter((e) => !e.user_id || !blockedIds.has(e.user_id))
-  const visibleMyEntries = myEntries
+  // 掛上創始成員徽章。放在這裡（而非各查詢處）是因為社群動態、工作坊、我的貼文
+  // 三條路徑都會流經 EntryCard，集中標記一次就好，不必每支查詢各處理。
+  const withFoundingBadge = useCallback(
+    (list: GratitudeEntry[]) =>
+      foundingSet.size === 0
+        ? list
+        : list.map((e) =>
+            e.user_id && foundingSet.has(e.user_id) ? { ...e, is_founding_member: true } : e,
+          ),
+    [foundingSet],
+  )
+
+  const visibleEntries = withFoundingBadge(
+    orderedEntries.filter((e) => !e.user_id || !blockedIds.has(e.user_id)),
+  )
+  const visibleMyEntries = withFoundingBadge(myEntries)
 
   // 社群動態：sentinel 進入視窗 → 向後端要下一批。依賴 feed 長度與 mode：每批載入後
   // 重新訂閱，若 sentinel 仍在視窗內會再次觸發（避免畫面很高時一次只載一批就停住）。
@@ -1362,10 +1403,18 @@ function CommunityPage() {
                 </div>
                 <div ref={sentinelRef} className="h-4" />
                 {communityLoading && <LoadMoreHint />}
+                {/* 封頂區塊。未解鎖時「已經看完所有」是假的——後面還有很多貼文，
+                    只是被鎖住，所以要換成誠實的解鎖引導（見 CommunityLockedFooter）。 */}
                 {!communityHasMore && !communityLoading && (
-                  <p className="py-8 text-center text-sm text-muted-foreground">
-                    {t('已經看完所有打卡紀錄囉！')}
-                  </p>
+                  entitlements && !entitlements.community.unlocked ? (
+                    <CommunityLockedFooter
+                      remaining={sharedTotal != null ? Math.max(0, sharedTotal - visibleEntries.length) : null}
+                    />
+                  ) : (
+                    <p className="py-8 text-center text-sm text-muted-foreground">
+                      {t('已經看完所有打卡紀錄囉！')}
+                    </p>
+                  )
                 )}
               </>
             )}
@@ -2481,10 +2530,16 @@ function EntryCard({
           <p className="truncate text-[21px] font-black tracking-[0.03em] text-foreground">
             {showRealName && anonName ? anonName : (localAnonName ?? t('匿名使用者'))}
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <p className="font-en text-sm font-semibold text-muted-foreground">{formatDate(entry.entry_date)}</p>
             {entry.current_streak != null && entry.current_streak > 0 && (
               <span className="text-xs font-semibold text-orange-500">{t('連續 {n} 天', { n: entry.current_streak })}</span>
+            )}
+            {/* 創始成員徽章：後台核准（subscriptions.is_founding_member）後才會出現 */}
+            {entry.is_founding_member && (
+              <span className="rounded-full bg-gold px-2 py-0.5 text-[11px] font-extrabold text-ink-deep">
+                {t('創始成員')}
+              </span>
             )}
             {isOwn && localPrivacy === 'private' && (
               <span className="text-xs font-semibold text-muted-foreground">{t('僅限本人')}</span>
