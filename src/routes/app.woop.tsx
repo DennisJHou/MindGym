@@ -14,6 +14,8 @@ import { downloadNodeAsPng, isMobileDevice } from '../lib/shareImage'
 import { type Privacy, DEFAULT_PRIVACY, PRIVACY_OPTIONS } from '../lib/privacy'
 import { useLanguage } from '../lib/i18n/context'
 import type { Language } from '../lib/i18n/language'
+import { useFoundingInviteGate } from '../lib/useFoundingInvite'
+import { FoundingInviteModal } from '../components/paywall/FoundingInviteModal'
 
 export const Route = createFileRoute('/app/woop')({
   component: WoopFlow,
@@ -233,6 +235,7 @@ function WoopFlow() {
   const { t, language } = useLanguage()
   const navigate = useNavigate()
   const router = useRouter()
+  const foundingInvite = useFoundingInviteGate()
   // phase：intro（開場介紹）→ 1~4（W/O/O/P）→ done（完成頁）
   const [phase, setPhase] = useState<'intro' | 1 | 2 | 3 | 4 | 'done'>('intro')
   const [wish, setWish] = useState('')
@@ -414,10 +417,10 @@ function WoopFlow() {
     if (finishing) return
     setFinishing(true)
     await router.invalidate()
-    navigate({
+    foundingInvite.gate(() => navigate({
       to: '/app/community',
       search: savedEntryId ? { focus: savedEntryId } : { showEntry: 1 },
-    })
+    }))
   }
 
   // ── 開場介紹頁 ───────────────────────────────────────────────────────────
@@ -644,6 +647,7 @@ function WoopFlow() {
             </button>
           </div>
         </div>
+        <FoundingInviteModal open={foundingInvite.open} onDismiss={foundingInvite.dismiss} />
       </>
     )
   }

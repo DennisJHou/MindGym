@@ -12,6 +12,8 @@ import { DateSwipeSheet } from '../components/DateSwipeSheet'
 import { TheorySection } from '../components/TheorySection'
 import { saveOrShareImage } from '../lib/shareImage'
 import heartsBanner from '../assets/ui/自我慈悲 內頁.png'
+import { useFoundingInviteGate } from '../lib/useFoundingInvite'
+import { FoundingInviteModal } from '../components/paywall/FoundingInviteModal'
 
 const WEEKDAY_LABELS = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
 
@@ -295,6 +297,7 @@ async function insertSelfCompassionEntry(
 function SelfCompassionPage() {
   const { t } = useLanguage()
   const navigate = useNavigate()
+  const foundingInvite = useFoundingInviteGate()
   const [stage, setStage] = useState<Stage>('INTRO')
   const [items, setItems] = useState<SelfCompassionItems>(EMPTY_ITEMS)
   const [privacy, setPrivacy] = useState<Privacy>(DEFAULT_PRIVACY)
@@ -372,10 +375,15 @@ function SelfCompassionPage() {
         />
       )}
       {stage === 'CELEBRATE' && (
-        <CelebrateStage
-          onNavigate={() => navigate({ to: '/app/community', search: { showEntry: 1 } })}
-          onBack={triggerBack}
-        />
+        <>
+          <CelebrateStage
+            onNavigate={() =>
+              foundingInvite.gate(() => navigate({ to: '/app/community', search: { showEntry: 1 } }))
+            }
+            onBack={triggerBack}
+          />
+          <FoundingInviteModal open={foundingInvite.open} onDismiss={foundingInvite.dismiss} />
+        </>
       )}
     </div>
   )

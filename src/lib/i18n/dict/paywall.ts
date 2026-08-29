@@ -32,6 +32,7 @@ export const paywall: Record<string, Translation> = {
   '／月': { 'zh-CN': '／月', en: '/month' },
   '創始會員・剩 {n} 位': { 'zh-CN': '创始会员・剩 {n} 位', en: 'Founding member · {n} left' },
   '申請加入創始成員': { 'zh-CN': '申请加入创始成员', en: 'Apply to be a founding member' },
+  '你已經是創始成員': { 'zh-CN': '你已经是创始成员', en: 'You’re already a founding member' },
   '處理中…': { 'zh-CN': '处理中…', en: 'Submitting…' },
   '開放訂閱後為 {price}，屆時會先通知你，不會自動扣款。': {
     'zh-CN': '开放订阅后为 {price}，届时会先通知你，不会自动扣款。',
@@ -72,11 +73,12 @@ export const paywall: Record<string, Translation> = {
     en: '14-day free trial, then {price}. Cancel anytime.',
   },
 
-  // ── 利益點（規格 §5.1：最多 3 條、每條 ≤14 字）────────────────────────
-  // 只列目前真的做得到的權益，不寫尚未實作的功能。
-  '每週一份 AI 週分析': { 'zh-CN': '每周一份 AI 周分析', en: 'A weekly AI analysis' },
-  '社群無限瀏覽': { 'zh-CN': '社区无限浏览', en: 'Unlimited community browsing' },
-  '基線檢測無限重測': { 'zh-CN': '基线检测无限重测', en: 'Retake your baseline anytime' },
+  // ── 利益點（2026-08-30 改版：付費牆一開始就完整列出權益，不再只列 3 條精簡版）──
+  '立即申請加入 PSY by PSY 心理健身房 創始成員': {
+    'zh-CN': '立即申请加入 PSY by PSY 心理健身房 创始成员',
+    en: 'Apply now to join PSY by PSY as a founding member',
+  },
+  '立即成為創始成員': { 'zh-CN': '立即成为创始成员', en: 'Become a founding member now' },
 
   // ── CTA 點擊後的說明（這階段不接金流）─────────────────────────────────
   '申請已送出，審核中！': {
@@ -87,9 +89,9 @@ export const paywall: Record<string, Translation> = {
     'zh-CN': '非常开心有你的加入，成为 PSY by PSY 心理健身房的创始成员！',
     en: "We're so glad to have you join PSY by PSY as a founding member!",
   },
-  '成為創始成員的你，在我們正式上架 App Store 後，你會獲得：': {
-    'zh-CN': '成为创始成员的你，在我们正式上架 App Store 后，你会获得：',
-    en: 'Once we officially launch on the App Store, as a founding member you’ll get:',
+  '我們開放訂閱會員的時候，你就可以擁有以下權益：': {
+    'zh-CN': '我们开放订阅会员的时候，你就可以拥有以下权益：',
+    en: 'Once subscriptions open, you’ll get the following benefits:',
   },
   '每週一份 AI 個人化心理健康專屬週報': {
     'zh-CN': '每周一份 AI 个人化心理健康专属周报',
@@ -114,6 +116,17 @@ export const paywall: Record<string, Translation> = {
   '通常 48 小時內會審核完成，通過後會通知你。': {
     'zh-CN': '通常 48 小时内会审核完成，通过后会通知你。',
     en: "Reviews usually take up to 48 hours. We'll let you know once it's approved.",
+  },
+  // ── 完成模組打卡後的創始成員邀請（一輩子只跳一次）───────────────────────
+  '今天也完成練習了，太棒了！': { 'zh-CN': '今天也完成练习了，太棒了！', en: 'You completed a practice today — nice!' },
+  '申請加入創始成員，之後你可以：': {
+    'zh-CN': '申请加入创始成员，之后你可以：',
+    en: 'Apply to be a founding member and you’ll get:',
+  },
+  '你已經是創始成員了！': { 'zh-CN': '你已经是创始成员了！', en: 'You’re already a founding member!' },
+  '你已經是 PSY by PSY 心理健身房的創始成員，我們開放訂閱後，以下權益會生效：': {
+    'zh-CN': '你已经是 PSY by PSY 心理健身房的创始成员，我们开放订阅后，以下权益会生效：',
+    en: 'You’re already a founding member of PSY by PSY — once subscriptions open, you’ll get:',
   },
   '知道了': { 'zh-CN': '知道了', en: 'Got it' },
   '訂閱功能尚未開放，敬請期待。': {

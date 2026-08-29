@@ -1614,9 +1614,10 @@ function ProfilePage() {
           <div className="flex flex-col gap-2">
             <Link
               to="/paywall"
-              className="flex h-12 w-full items-center justify-center rounded-2xl bg-primary-soft text-sm font-bold text-foreground transition active:scale-[0.98]"
+              className="flex h-auto min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-2xl bg-primary-soft px-3 py-3 text-center transition active:scale-[0.98]"
             >
-              {t('訂閱方案')}
+              <span className="text-base font-extrabold text-foreground">{t('訂閱方案')}</span>
+              <span className="text-sm font-bold text-gold-deep">{t('立即成為創始成員')}</span>
             </Link>
             <button
               onClick={() => void handleLogout()}

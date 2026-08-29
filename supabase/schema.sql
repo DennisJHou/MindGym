@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS profiles (
 
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar text;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS current_streak integer DEFAULT 0;
+-- 記錄「第一次完成任一健心模組後跳出的創始成員邀請」是否已經跳過，一個使用者一輩子只跳一次。
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS founding_invite_shown_at timestamptz;
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 

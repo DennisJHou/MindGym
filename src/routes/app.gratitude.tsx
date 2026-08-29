@@ -14,6 +14,8 @@ import { PermaGrowthCard } from '../components/PermaGrowthCard'
 import { TheorySection } from '../components/TheorySection'
 import { track } from '../lib/analytics'
 import { useStageBack } from '../lib/useStageBack'
+import { useFoundingInviteGate } from '../lib/useFoundingInvite'
+import { FoundingInviteModal } from '../components/paywall/FoundingInviteModal'
 import { type Privacy, DEFAULT_PRIVACY, PRIVACY_OPTIONS, privacyToFields } from '../lib/privacy'
 import {
   fetchGratitudeSummary as fetchSummary,
@@ -196,6 +198,7 @@ function GratitudePage() {
   const [summaryStreak, setSummaryStreak] = useState<number | null>(null)
   const navigate = useNavigate()
   const router = useRouter()
+  const foundingInvite = useFoundingInviteGate()
 
   // 邊寫邊存草稿。只在「還沒寫進資料庫」的階段存：存檔成功後草稿就清掉了
   // （見 performSave），結束頁也不需要再存。停下來 400ms 才寫，不用每個字都碰
@@ -402,7 +405,7 @@ function GratitudePage() {
 
   const handleFinalSave = async () => {
     await router.invalidate()
-    navigate({ to: '/app/community', search: { showEntry: 1 } })
+    foundingInvite.gate(() => navigate({ to: '/app/community', search: { showEntry: 1 } }))
   }
 
   switch (stage) {
@@ -457,13 +460,16 @@ function GratitudePage() {
       )
     case 'CELEBRATE':
       return (
-        <CelebrateStage
-          privacy={privacy}
-          onPrivacyChange={handlePrivacyChange}
-          onNavigate={handleFinalSave}
-          onBack={triggerBack}
-          streakOverride={celebrateStreak}
-        />
+        <>
+          <CelebrateStage
+            privacy={privacy}
+            onPrivacyChange={handlePrivacyChange}
+            onNavigate={handleFinalSave}
+            onBack={triggerBack}
+            streakOverride={celebrateStreak}
+          />
+          <FoundingInviteModal open={foundingInvite.open} onDismiss={foundingInvite.dismiss} />
+        </>
       )
   }
 }

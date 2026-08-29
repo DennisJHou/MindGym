@@ -16,6 +16,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../../lib/supabase'
 import { track } from '../../lib/analytics'
+import { FREE_FALLBACK, fetchEntitlements } from '../../lib/entitlements'
 import { useLanguage } from '../../lib/i18n/context'
 import {
   type PricingBundle,
@@ -72,6 +73,20 @@ export function PaywallScreen({ source, scores: scoresProp, onDismiss }: Paywall
   const [submitting, setSubmitting] = useState(false)
   const [showIntentNotice, setShowIntentNotice] = useState(false)
   const [showRestoreNotice, setShowRestoreNotice] = useState(false)
+  const [isFoundingMember, setIsFoundingMember] = useState(false)
+  const [showAlreadyFoundingNotice, setShowAlreadyFoundingNotice] = useState(false)
+
+  // 已核准的創始成員再點一次 CTA 時要讓他們知道「已經是了」，而不是看起來像沒反應。
+  useEffect(() => {
+    let cancelled = false
+    void fetchEntitlements().then((ent) => {
+      // fetchEntitlements 查詢失敗時回傳 FREE_FALLBACK 這個常數本身（保守預設）。
+      // 那是給「要不要顯示付費功能」用的，不能拿來當「不是創始成員」的證據。
+      if (cancelled || ent === FREE_FALLBACK) return
+      setIsFoundingMember(ent.is_founding_member)
+    })
+    return () => { cancelled = true }
+  }, [])
 
   // 價格與名額
   useEffect(() => {
@@ -129,6 +144,11 @@ export function PaywallScreen({ source, scores: scoresProp, onDismiss }: Paywall
   // 提示視窗一定要跳出來，讓使用者知道「有點到」——背景記錄失敗與否不影響這個承諾。
   const handleCta = async () => {
     if (!selected || submitting) return
+    if (isFoundingMember) {
+      track('paywall_already_founding_member', { source })
+      setShowAlreadyFoundingNotice(true)
+      return
+    }
     setSubmitting(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -159,7 +179,7 @@ export function PaywallScreen({ source, scores: scoresProp, onDismiss }: Paywall
   const hl = highLowDimensions(scores)
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+    <div className="fixed-viewport-h fixed inset-x-0 top-0 z-50 flex flex-col bg-background">
       {/* 1. 關閉鈕：左上角，第一秒即可見（規格 §5.1.1，不做延遲顯示） */}
       <div className="shrink-0 px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
         <button
@@ -186,12 +206,21 @@ export function PaywallScreen({ source, scores: scoresProp, onDismiss }: Paywall
             </p>
           )}
           <h1 className="mt-2 text-2xl font-black leading-snug text-foreground">
-            {t('成為心理健身房會員，解鎖下週的你')}
+            {t('立即申請加入 PSY by PSY 心理健身房 創始成員')}
           </h1>
+          <p className="mt-2 text-sm font-bold text-foreground/80">
+            {t('我們開放訂閱會員的時候，你就可以擁有以下權益：')}
+          </p>
 
-          {/* 3. 利益點：最多 3 條，每條 ≤14 字（規格 §5.1.3） */}
+          {/* 3. 利益點：完整列出創始成員權益，讓使用者在看到方案價格前就先知道能拿到什麼 */}
           <ul className="mt-5 flex flex-col gap-2.5">
-            {['每週一份 AI 週分析', '社群無限瀏覽', '基線檢測無限重測'].map((line) => (
+            {[
+              '每週一份 AI 個人化心理健康專屬週報',
+              '社群功能無限瀏覽，不受免費層次數限制',
+              '健身房新菜單，搶先體驗',
+              '基線檢測（PERMA 測驗）無限次重測',
+              '貼文掛上「創始成員」專屬徽章',
+            ].map((line) => (
               <li key={line} className="flex items-center gap-2.5">
                 <CheckIcon />
                 <span className="text-sm font-bold text-foreground">{t(line)}</span>
@@ -231,7 +260,11 @@ export function PaywallScreen({ source, scores: scoresProp, onDismiss }: Paywall
             disabled={!selected || submitting}
             className="flex h-14 w-full items-center justify-center rounded-full bg-gradient-primary text-base font-extrabold tracking-wide text-primary-foreground shadow-soft transition active:scale-[0.98] disabled:opacity-50"
           >
-            {submitting ? t('處理中…') : t('申請加入創始成員')}
+            {submitting
+              ? t('處理中…')
+              : isFoundingMember
+                ? t('你已經是創始成員')
+                : t('申請加入創始成員')}
           </button>
 
           {/* 6. 條款行：說明未來的收費方式。目前尚未接金流，所以不寫「到期後扣款」
@@ -267,7 +300,7 @@ export function PaywallScreen({ source, scores: scoresProp, onDismiss }: Paywall
           body={
             <>
               <p>{t('非常開心有你的加入，成為 PSY by PSY 心理健身房的創始成員！')}</p>
-              <p className="mt-3">{t('成為創始成員的你，在我們正式上架 App Store 後，你會獲得：')}</p>
+              <p className="mt-3">{t('我們開放訂閱會員的時候，你就可以擁有以下權益：')}</p>
               <ul className="mt-3 flex flex-col gap-2">
                 {[
                   '每週一份 AI 個人化心理健康專屬週報',
@@ -295,6 +328,31 @@ export function PaywallScreen({ source, scores: scoresProp, onDismiss }: Paywall
           title={t('恢復購買')}
           body={t('訂閱功能尚未開放，敬請期待。')}
           onClose={() => setShowRestoreNotice(false)}
+        />
+      )}
+      {showAlreadyFoundingNotice && (
+        <NoticeSheet
+          title={t('你已經是創始成員了！')}
+          body={
+            <>
+              <p>{t('你已經是 PSY by PSY 心理健身房的創始成員，我們開放訂閱後，以下權益會生效：')}</p>
+              <ul className="mt-3 flex flex-col gap-2">
+                {[
+                  '每週一份 AI 個人化心理健康專屬週報',
+                  '社群功能無限瀏覽，不受免費層次數限制',
+                  '健身房新菜單，搶先體驗',
+                  '基線檢測（PERMA 測驗）無限次重測',
+                  '貼文掛上「創始成員」專屬徽章',
+                ].map((line) => (
+                  <li key={line} className="flex items-start gap-2">
+                    <CheckIcon />
+                    <span className="text-sm font-bold text-foreground">{t(line)}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          }
+          onClose={() => setShowAlreadyFoundingNotice(false)}
         />
       )}
     </div>

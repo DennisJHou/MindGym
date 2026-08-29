@@ -14,6 +14,8 @@ import { DateSwipeSheet } from '../components/DateSwipeSheet'
 import { TheorySection } from '../components/TheorySection'
 import { type Privacy, DEFAULT_PRIVACY, PRIVACY_OPTIONS, privacyToFields } from '../lib/privacy'
 import processGoalBanner from '../assets/ui/process-goal-intro-banner.png'
+import { useFoundingInviteGate } from '../lib/useFoundingInvite'
+import { FoundingInviteModal } from '../components/paywall/FoundingInviteModal'
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8000'
 
@@ -1306,6 +1308,7 @@ function PgCelebrateStage({
   const { t } = useLanguage()
   const navigate = useNavigate()
   const router = useRouter()
+  const foundingInvite = useFoundingInviteGate()
   const [privacy, setPrivacy] = useState<Privacy>(DEFAULT_PRIVACY)
   const [todayCount, setTodayCount] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
@@ -1336,10 +1339,11 @@ function PgCelebrateStage({
     setSaving(true)
     await router.invalidate()
     // 與感恩日記一致：導向社群動態牆（貼文已 is_shared，會出現在牆上）
-    navigate({ to: '/app/community', search: { showEntry: 1 } })
+    foundingInvite.gate(() => navigate({ to: '/app/community', search: { showEntry: 1 } }))
   }
 
   return (
+    <>
     <div className="animate-fade-up mx-auto flex max-w-3xl flex-col items-center px-6 pb-8 pt-5 md:px-10">
       {/* 完成圖示 */}
       <div className="celebrate-pop mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-primary shadow-soft">
@@ -1425,5 +1429,7 @@ function PgCelebrateStage({
         <GhostButton onClick={onIntro}>{t('回練習選單')}</GhostButton>
       </div>
     </div>
+    <FoundingInviteModal open={foundingInvite.open} onDismiss={foundingInvite.dismiss} />
+    </>
   )
 }
