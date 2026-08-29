@@ -22,6 +22,26 @@ export const authPages: Record<string, Translation> = {
     'zh-CN': '注册失败，请确认 email 格式或稍后再试。',
     en: 'Sign-up failed — please check your email format or try again later.',
   },
+  '這個 email 已經註冊過了，請直接登入。': {
+    'zh-CN': '这个 email 已经注册过了，请直接登录。',
+    en: 'This email is already registered — please log in instead.',
+  },
+  '驗證信寄送已達次數上限，請稍後再試，或改用 Google 登入。': {
+    'zh-CN': '验证信发送已达次数上限，请稍后再试，或改用 Google 登录。',
+    en: 'Verification email limit reached — please try again later, or sign in with Google.',
+  },
+  '驗證信寄送失敗（信件服務異常），請改用 Google 登入或聯絡我們。': {
+    'zh-CN': '验证信发送失败（邮件服务异常），请改用 Google 登录或联系我们。',
+    en: 'Could not send the verification email (mail service error) — please sign in with Google or contact us.',
+  },
+  '沒收到？重寄驗證信': {
+    'zh-CN': '没收到？重发验证信',
+    en: "Didn't get it? Resend verification email",
+  },
+  '已重新寄出驗證信。': {
+    'zh-CN': '已重新发送验证信。',
+    en: 'Verification email sent again.',
+  },
   '請至信箱查收驗證信，完成後即可登入。': {
     'zh-CN': '请至邮箱查收验证信，完成后即可登录。',
     en: 'Please check your email for a verification link — once confirmed, you can log in.',

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createFileRoute, redirect, Link } from '@tanstack/react-router'
+import type { AuthError } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { track } from '../lib/analytics'
 import {
@@ -26,6 +27,27 @@ export const Route = createFileRoute('/login')({
 // 'login' = 帳號密碼登入，'signup' = 註冊新帳號
 type EmailMode = 'login' | 'signup'
 
+// 驗證信連結要導回的網址。App 內用線上版網域，讓在手機信箱點連結也開得起來。
+function confirmRedirectTo() {
+  return `${window.location.origin}/app/home`
+}
+
+// 註冊失敗的原因差很多（信箱已註冊 vs 驗證信根本寄不出去），
+// 全部收斂成「請稍後再試」的話使用者與我們都查不出是哪一種，這裡把常見的分開講。
+function signUpErrorMessage(error: AuthError, t: (text: string) => string) {
+  const message = error.message.toLowerCase()
+  if (error.code === 'user_already_exists' || message.includes('already registered')) {
+    return t('這個 email 已經註冊過了，請直接登入。')
+  }
+  if (error.status === 429 || message.includes('rate limit') || message.includes('for security purposes')) {
+    return t('驗證信寄送已達次數上限，請稍後再試，或改用 Google 登入。')
+  }
+  if (message.includes('sending confirmation email') || message.includes('sending email')) {
+    return t('驗證信寄送失敗（信件服務異常），請改用 Google 登入或聯絡我們。')
+  }
+  return t('註冊失敗，請確認 email 格式或稍後再試。')
+}
+
 function LoginPage() {
   const { t } = useLanguage()
   const [email, setEmail] = useState('')
@@ -36,6 +58,8 @@ function LoginPage() {
   // 註冊後若專案開啟「Confirm email」，signUp() 不會馬上給 session，
   // 要提示使用者去信箱點驗證信連結，而不是讓畫面看起來卡住。
   const [pendingConfirmation, setPendingConfirmation] = useState(false)
+  // 驗證信重寄的結果（成功/失敗），只顯示在等待驗證的那張卡片上。
+  const [resendNotice, setResendNotice] = useState<string | null>(null)
   // 從 LINE / FB / IG… App 內建瀏覽器打開時，Google 會擋下登入，
   // 這裡記錄是哪一種 App，好顯示對應的引導畫面（null = 不顯示）。
   const [inAppNotice, setInAppNotice] = useState<InAppBrowser>(null)
@@ -134,11 +158,17 @@ function LoginPage() {
     }
 
     // mode === 'signup'
-    const { data, error } = await supabase.auth.signUp({ email: trimmedEmail, password })
+    // emailRedirectTo：驗證信裡的連結要導回線上版；不指定就吃 Supabase 專案的 Site URL，
+    // 那邊若還留著 localhost，使用者點驗證信只會打不開。
+    const { data, error } = await supabase.auth.signUp({
+      email: trimmedEmail,
+      password,
+      options: { emailRedirectTo: confirmRedirectTo() },
+    })
     setLoading(false)
     if (error) {
-      track('login_error', { method: 'password', mode })
-      setError(t('註冊失敗，請確認 email 格式或稍後再試。'))
+      track('login_error', { method: 'password', mode, reason: error.code ?? String(error.status) })
+      setError(signUpErrorMessage(error, t))
       return
     }
     if (data.session) {
@@ -148,6 +178,18 @@ function LoginPage() {
     }
     // 開啟了「Confirm email」：還沒有 session，要先去信箱點驗證信。
     setPendingConfirmation(true)
+  }
+
+  const handleResendConfirmation = async () => {
+    setLoading(true)
+    setResendNotice(null)
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim(),
+      options: { emailRedirectTo: confirmRedirectTo() },
+    })
+    setLoading(false)
+    setResendNotice(error ? signUpErrorMessage(error, t) : t('已重新寄出驗證信。'))
   }
 
   const handleForgotPassword = async () => {
@@ -212,9 +254,20 @@ function LoginPage() {
               <p className="text-sm font-semibold text-foreground">
                 {t('請至信箱查收驗證信，完成後即可登入。')}
               </p>
+              {resendNotice && (
+                <p className="mt-2 text-xs font-semibold text-muted-foreground">{resendNotice}</p>
+              )}
+              <button
+                onClick={handleResendConfirmation}
+                disabled={loading}
+                className="mt-3 block w-full text-xs font-semibold text-primary underline disabled:opacity-50"
+              >
+                {t('沒收到？重寄驗證信')}
+              </button>
               <button
                 onClick={() => {
                   setPendingConfirmation(false)
+                  setResendNotice(null)
                   setMode('login')
                 }}
                 className="mt-3 text-xs font-semibold text-muted-foreground underline"
