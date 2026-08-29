@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { createFileRoute, redirect, Link } from '@tanstack/react-router'
-import type { AuthError } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { track } from '../lib/analytics'
 import {
@@ -24,42 +23,23 @@ export const Route = createFileRoute('/login')({
   component: LoginPage,
 })
 
-// 'login' = 帳號密碼登入，'signup' = 註冊新帳號
-type EmailMode = 'login' | 'signup'
-
-// 驗證信連結要導回的網址。App 內用線上版網域，讓在手機信箱點連結也開得起來。
-function confirmRedirectTo() {
-  return `${window.location.origin}/app/home`
-}
-
-// 註冊失敗的原因差很多（信箱已註冊 vs 驗證信根本寄不出去），
-// 全部收斂成「請稍後再試」的話使用者與我們都查不出是哪一種，這裡把常見的分開講。
-function signUpErrorMessage(error: AuthError, t: (text: string) => string) {
-  const message = error.message.toLowerCase()
-  if (error.code === 'user_already_exists' || message.includes('already registered')) {
-    return t('這個 email 已經註冊過了，請直接登入。')
-  }
-  if (error.status === 429 || message.includes('rate limit') || message.includes('for security purposes')) {
-    return t('驗證信寄送已達次數上限，請稍後再試，或改用 Google 登入。')
-  }
-  if (message.includes('sending confirmation email') || message.includes('sending email')) {
-    return t('驗證信寄送失敗（信件服務異常），請改用 Google 登入或聯絡我們。')
-  }
-  return t('註冊失敗，請確認 email 格式或稍後再試。')
-}
+// 只留 Google 與 Apple 登入（2026-08-29）。
+//
+// 原本還有 email／密碼註冊，但 Supabase 內建寄信服務只寄給專案 team 成員、且限
+// 2 封/小時，所以驗證信對任何真實使用者都寄不出去——這條路從上線以來從來沒有
+// 為站外的人運作過。實際分佈：1,088 個帳號裡 Google 佔 1,065、Apple 21，純
+// email／密碼只有 2 個（都是團隊自己開的測試帳號，沒有任何日記或測驗紀錄）。
+//
+// 留著它的代價是要養一整條 email 管道（SMTP、網域驗證、退信、重設密碼頁面），
+// 換來 0.2% 的使用者；而 Google／Apple 回傳的信箱本來就是已驗證的。所以整條拿掉。
+// Supabase 後台的 Email provider 沒有關閉，日後真要恢復只需把 UI 加回來。
+//
+// 註：驗證信不是 App Store 的要求——8/16 的退件是 Guideline 1.2／2.1／2.3.3，
+// 跟帳號有關的硬性要求（4.8 Sign in with Apple、5.1.1(v) 刪除帳號、1.2 EULA）
+// 都已經滿足。
 
 function LoginPage() {
   const { t } = useLanguage()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [mode, setMode] = useState<EmailMode>('login')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  // 註冊後若專案開啟「Confirm email」，signUp() 不會馬上給 session，
-  // 要提示使用者去信箱點驗證信連結，而不是讓畫面看起來卡住。
-  const [pendingConfirmation, setPendingConfirmation] = useState(false)
-  // 驗證信重寄的結果（成功/失敗），只顯示在等待驗證的那張卡片上。
-  const [resendNotice, setResendNotice] = useState<string | null>(null)
   // 從 LINE / FB / IG… App 內建瀏覽器打開時，Google 會擋下登入，
   // 這裡記錄是哪一種 App，好顯示對應的引導畫面（null = 不顯示）。
   const [inAppNotice, setInAppNotice] = useState<InAppBrowser>(null)
@@ -136,79 +116,6 @@ function LoginPage() {
     }
   }
 
-  const handleSubmitPassword = async () => {
-    if (!requireAgreement()) return
-    const trimmedEmail = email.trim()
-    if (!trimmedEmail || !password) return
-    setLoading(true)
-    setError(null)
-    track('login_started', { method: 'password', mode })
-
-    if (mode === 'login') {
-      const { error } = await supabase.auth.signInWithPassword({ email: trimmedEmail, password })
-      setLoading(false)
-      if (error) {
-        track('login_error', { method: 'password', mode })
-        setError(t('Email 或密碼錯誤，請再試一次。'))
-        return
-      }
-      track('login_completed', { method: 'password' })
-      // 成功後 onAuthStateChange 會更新 session，beforeLoad 自動導向 /app/home
-      return
-    }
-
-    // mode === 'signup'
-    // emailRedirectTo：驗證信裡的連結要導回線上版；不指定就吃 Supabase 專案的 Site URL，
-    // 那邊若還留著 localhost，使用者點驗證信只會打不開。
-    const { data, error } = await supabase.auth.signUp({
-      email: trimmedEmail,
-      password,
-      options: { emailRedirectTo: confirmRedirectTo() },
-    })
-    setLoading(false)
-    if (error) {
-      track('login_error', { method: 'password', mode, reason: error.code ?? String(error.status) })
-      setError(signUpErrorMessage(error, t))
-      return
-    }
-    if (data.session) {
-      // 專案未開啟「Confirm email」：註冊即登入，session 已建立。
-      track('login_completed', { method: 'password' })
-      return
-    }
-    // 開啟了「Confirm email」：還沒有 session，要先去信箱點驗證信。
-    setPendingConfirmation(true)
-  }
-
-  const handleResendConfirmation = async () => {
-    setLoading(true)
-    setResendNotice(null)
-    const { error } = await supabase.auth.resend({
-      type: 'signup',
-      email: email.trim(),
-      options: { emailRedirectTo: confirmRedirectTo() },
-    })
-    setLoading(false)
-    setResendNotice(error ? signUpErrorMessage(error, t) : t('已重新寄出驗證信。'))
-  }
-
-  const handleForgotPassword = async () => {
-    const trimmedEmail = email.trim()
-    if (!trimmedEmail) {
-      setError(t('請先輸入 email，才能寄送重設密碼信。'))
-      return
-    }
-    setLoading(true)
-    setError(null)
-    const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail)
-    setLoading(false)
-    if (error) {
-      setError(t('寄送失敗，請確認 email 後再試一次。'))
-      return
-    }
-    setError(t('已寄出重設密碼信，請至信箱查收。'))
-  }
-
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-end overflow-x-hidden px-6 pt-12">
       {/* 外層 frame-width：把語言鈕收進手機外框的欄位（詳見 index.css 的
@@ -245,98 +152,10 @@ function LoginPage() {
         <img src={coachWelcome} alt={t('PSY by PSY 教練')} className="relative h-52 w-auto drop-shadow-sm" />
       </div>
 
-      {/* 底部 CTA：走正常排版流，不用 fixed —— 否則面板高度一變（例如加回帳密欄位、
-          多一顆 Apple 按鈕）就得同步改上面的預留 padding，改漏就會蓋住插圖與文案。 */}
+      {/* 底部 CTA：走正常排版流，不用 fixed —— 否則面板高度一變（例如多一顆
+          Apple 按鈕）就得同步改上面的預留 padding，改漏就會蓋住插圖與文案。 */}
       <div className="w-full pb-10 pt-8">
         <div className="mx-auto w-full max-w-sm space-y-3">
-          {pendingConfirmation ? (
-            <div className="rounded-3xl bg-card px-6 py-5 text-center shadow-soft">
-              <p className="text-sm font-semibold text-foreground">
-                {t('請至信箱查收驗證信，完成後即可登入。')}
-              </p>
-              {resendNotice && (
-                <p className="mt-2 text-xs font-semibold text-muted-foreground">{resendNotice}</p>
-              )}
-              <button
-                onClick={handleResendConfirmation}
-                disabled={loading}
-                className="mt-3 block w-full text-xs font-semibold text-primary underline disabled:opacity-50"
-              >
-                {t('沒收到？重寄驗證信')}
-              </button>
-              <button
-                onClick={() => {
-                  setPendingConfirmation(false)
-                  setResendNotice(null)
-                  setMode('login')
-                }}
-                className="mt-3 text-xs font-semibold text-muted-foreground underline"
-              >
-                {t('已有帳號？前往登入')}
-              </button>
-            </div>
-          ) : (
-            <>
-              <input
-                type="email"
-                inputMode="email"
-                autoComplete="email"
-                placeholder={t('輸入 email')}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="h-14 w-full rounded-full bg-card px-6 text-center text-base font-semibold text-foreground shadow-soft outline-none placeholder:text-muted-foreground/60"
-              />
-              <input
-                type="password"
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                placeholder={t('輸入密碼')}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="h-14 w-full rounded-full bg-card px-6 text-center text-base font-semibold text-foreground shadow-soft outline-none placeholder:text-muted-foreground/60"
-              />
-
-              {error && (
-                <p className="text-center text-xs font-semibold text-red-500">{error}</p>
-              )}
-
-              <button
-                onClick={handleSubmitPassword}
-                disabled={loading || !email.trim() || !password}
-                className="flex h-16 w-full items-center justify-center rounded-full bg-primary text-base font-extrabold tracking-wide text-primary-foreground shadow-soft transition active:scale-[0.98] disabled:opacity-50"
-              >
-                {loading
-                  ? mode === 'login' ? t('登入中…') : t('建立帳號中…')
-                  : mode === 'login' ? t('登入') : t('註冊')}
-              </button>
-
-              <div className="flex items-center justify-between px-2">
-                <button
-                  onClick={() => {
-                    setMode(mode === 'login' ? 'signup' : 'login')
-                    setError(null)
-                  }}
-                  className="text-xs font-semibold text-muted-foreground underline"
-                >
-                  {mode === 'login' ? t('還沒有帳號？註冊新帳號') : t('已有帳號？前往登入')}
-                </button>
-                {mode === 'login' && (
-                  <button
-                    onClick={handleForgotPassword}
-                    className="text-xs font-semibold text-muted-foreground underline"
-                  >
-                    {t('忘記密碼？')}
-                  </button>
-                )}
-              </div>
-
-              <div className="flex items-center gap-3 py-1">
-                <span className="h-px flex-1 bg-muted-foreground/20" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('或')}</span>
-                <span className="h-px flex-1 bg-muted-foreground/20" />
-              </div>
-            </>
-          )}
-
           {isNativeApp() && (
             <button
               onClick={handleAppleLogin}
