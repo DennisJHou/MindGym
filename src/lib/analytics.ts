@@ -82,6 +82,8 @@ export type AnalyticsEvent =
   | 'soft_paywall_shown'                 // 週分析額度用完，顯示軟性付費牆
   | 'baseline_retake_blocked'            // 免費層基線檢測額度用完，重測被擋下
   | 'community_lock_shown'               // 社群未解鎖（未貢獻），顯示貢獻換觀看提示
+  | 'paywall_already_founding_member'    // 已是創始成員的人再按一次付費牆 CTA
+  | 'founding_invite_apply_clicked'      // 完成模組後的創始成員邀請視窗，按下「申請加入」
 
 // 已就緒的 posthog 實例；尚未載入完成時為 null。
 let ph: PostHog | null = null
