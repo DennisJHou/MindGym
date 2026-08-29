@@ -309,6 +309,31 @@ BEGIN
         updated_at         = now();
 END; $$;
 
+-- ============================================================
+-- 8.1 創始成員審核通過 → 自動推播通知本人
+--    沿用 push_notifications.sql 已經建好的 APNs 基礎建設
+--    （device_tokens、notify_push_on_interaction()、push-notify Edge Function），
+--    不需要重新設定任何金鑰——只是多接一張表的 trigger。
+--    push-notify/index.ts 已經加了 table === 'subscriptions' 的分支。
+--    ⚠️ 依賴 push_notifications.sql 已先執行過（notify_push_on_interaction 存在）。
+-- ============================================================
+
+-- set_user_subscription() 是 upsert：第一次核准通常是「新增一列、is_founding_member
+-- 直接是 true」（INSERT），之後在訂閱管理手動改動才是「既有列從 false 改成 true」（UPDATE）。
+-- 分成兩支 trigger 是因為同一支 trigger 不能在 INSERT 事件裡合法引用 OLD。
+DROP TRIGGER IF EXISTS subscriptions_founding_insert_push ON subscriptions;
+DROP TRIGGER IF EXISTS subscriptions_founding_update_push ON subscriptions;
+
+CREATE TRIGGER subscriptions_founding_insert_push
+  AFTER INSERT ON subscriptions
+  FOR EACH ROW WHEN (NEW.is_founding_member = true)
+  EXECUTE FUNCTION notify_push_on_interaction();
+
+CREATE TRIGGER subscriptions_founding_update_push
+  AFTER UPDATE OF is_founding_member ON subscriptions
+  FOR EACH ROW WHEN (NEW.is_founding_member = true AND OLD.is_founding_member IS DISTINCT FROM true)
+  EXECUTE FUNCTION notify_push_on_interaction();
+
 -- /admin →「訂閱管理」用：依姓名或 email 搜尋使用者並帶出訂閱狀態。
 CREATE OR REPLACE FUNCTION admin_search_subscriptions(p_query text DEFAULT '')
 RETURNS TABLE (

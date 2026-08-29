@@ -13,7 +13,7 @@
 // ⚠️ 規格 §5.3 硬性限制：無倒數計時、無閃爍、無紅色警示、無 before/after 對比、
 //    無恐懼訴求、無療效承諾；創始名額連動真實資料（founding_seats_remaining()）。
 // ─────────────────────────────────────────────────────────────────────────
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../../lib/supabase'
 import { track } from '../../lib/analytics'
 import { useLanguage } from '../../lib/i18n/context'
@@ -126,23 +126,29 @@ export function PaywallScreen({ source, scores: scoresProp, onDismiss }: Paywall
   }
 
   // 主 CTA：記錄付費意願，然後立刻說明目前的開放狀況。不扣款、不跳外部連結。
+  // 提示視窗一定要跳出來，讓使用者知道「有點到」——背景記錄失敗與否不影響這個承諾。
   const handleCta = async () => {
     if (!selected || submitting) return
     setSubmitting(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    const userId = session?.user.id
-    if (userId) {
-      const { error } = await supabase.from('paywall_intents').insert({
-        user_id: userId,
-        plan_code: selected.planCode,
-        variant: bundle?.config.variant ?? 'A',
-        source,
-      })
-      if (error) console.error('[paywall] 記錄付費意願失敗', error)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const userId = session?.user.id
+      if (userId) {
+        const { error } = await supabase.from('paywall_intents').insert({
+          user_id: userId,
+          plan_code: selected.planCode,
+          variant: bundle?.config.variant ?? 'A',
+          source,
+        })
+        if (error) console.error('[paywall] 記錄付費意願失敗', error)
+      }
+      track('paywall_intent_recorded', { source, plan_code: selected.planCode })
+    } catch (err) {
+      console.error('[paywall] 記錄付費意願發生例外', err)
+    } finally {
+      setSubmitting(false)
+      setShowIntentNotice(true)
     }
-    track('paywall_intent_recorded', { source, plan_code: selected.planCode })
-    setSubmitting(false)
-    setShowIntentNotice(true)
   }
 
   const handleDismiss = () => {
@@ -225,7 +231,7 @@ export function PaywallScreen({ source, scores: scoresProp, onDismiss }: Paywall
             disabled={!selected || submitting}
             className="flex h-14 w-full items-center justify-center rounded-full bg-gradient-primary text-base font-extrabold tracking-wide text-primary-foreground shadow-soft transition active:scale-[0.98] disabled:opacity-50"
           >
-            {t('申請加入創始成員')}
+            {submitting ? t('處理中…') : t('申請加入創始成員')}
           </button>
 
           {/* 6. 條款行：說明未來的收費方式。目前尚未接金流，所以不寫「到期後扣款」
@@ -257,8 +263,30 @@ export function PaywallScreen({ source, scores: scoresProp, onDismiss }: Paywall
 
       {showIntentNotice && (
         <NoticeSheet
-          title={t('創始會員目前僅開放給社群成員')}
-          body={t('我們記下你的興趣了。開放訂閱時會再通知你。')}
+          title={t('申請已送出，審核中！')}
+          body={
+            <>
+              <p>{t('非常開心有你的加入，成為 PSY by PSY 心理健身房的創始成員！')}</p>
+              <p className="mt-3">{t('成為創始成員的你，在我們正式上架 App Store 後，你會獲得：')}</p>
+              <ul className="mt-3 flex flex-col gap-2">
+                {[
+                  '每週一份 AI 個人化心理健康專屬週報',
+                  '社群功能無限瀏覽，不受免費層次數限制',
+                  '健身房新菜單，搶先體驗',
+                  '基線檢測（PERMA 測驗）無限次重測',
+                  '貼文掛上「創始成員」專屬徽章',
+                ].map((line) => (
+                  <li key={line} className="flex items-start gap-2">
+                    <CheckIcon />
+                    <span className="text-sm font-bold text-foreground">{t(line)}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-xs text-muted-foreground">
+                {t('通常 48 小時內會審核完成，通過後會通知你。')}
+              </p>
+            </>
+          }
           onClose={() => { setShowIntentNotice(false); onDismiss() }}
         />
       )}
@@ -273,13 +301,13 @@ export function PaywallScreen({ source, scores: scoresProp, onDismiss }: Paywall
   )
 }
 
-function NoticeSheet({ title, body, onClose }: { title: string; body: string; onClose: () => void }) {
+function NoticeSheet({ title, body, onClose }: { title: string; body: ReactNode; onClose: () => void }) {
   const { t } = useLanguage()
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#1c1714]/40 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]" onClick={onClose}>
-      <div className="w-full max-w-sm rounded-[24px] bg-card p-6 shadow-soft" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-sm max-h-[85vh] overflow-y-auto rounded-[24px] bg-card p-6 shadow-soft" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-lg font-black text-foreground">{title}</h2>
-        <p className="mt-2 text-[15px] leading-relaxed text-foreground/80">{body}</p>
+        <div className="mt-2 text-[15px] leading-relaxed text-foreground/80">{body}</div>
         <button
           onClick={onClose}
           className="mt-5 w-full rounded-full bg-gradient-primary py-3 text-base font-extrabold text-primary-foreground shadow-soft transition active:scale-[0.98]"
