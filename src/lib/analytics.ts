@@ -80,6 +80,7 @@ export type AnalyticsEvent =
   | 'paywall_intent_recorded'            // 按下主 CTA，付費意願已寫入 paywall_intents
   | 'paywall_dismissed'                  // 關閉付費牆或點「先自己逛逛」
   | 'soft_paywall_shown'                 // 週分析額度用完，顯示軟性付費牆
+  | 'baseline_retake_blocked'            // 免費層基線檢測額度用完，重測被擋下
   | 'community_lock_shown'               // 社群未解鎖（未貢獻），顯示貢獻換觀看提示
 
 // 已就緒的 posthog 實例；尚未載入完成時為 null。
