@@ -23,23 +23,32 @@ export const Route = createFileRoute('/login')({
   component: LoginPage,
 })
 
-// 只留 Google 與 Apple 登入（2026-08-29）。
+// 登入方式：主推 Google／Apple，email 密碼登入收在次要入口（2026-08-29）。
 //
-// 原本還有 email／密碼註冊，但 Supabase 內建寄信服務只寄給專案 team 成員、且限
-// 2 封/小時，所以驗證信對任何真實使用者都寄不出去——這條路從上線以來從來沒有
-// 為站外的人運作過。實際分佈：1,088 個帳號裡 Google 佔 1,065、Apple 21，純
-// email／密碼只有 2 個（都是團隊自己開的測試帳號，沒有任何日記或測驗紀錄）。
+// 為什麼拿掉 email「註冊」：Supabase 內建寄信服務只寄給專案 team 成員、且限
+// 2 封/小時（官方明言僅供測試），所以驗證信對站外使用者根本寄不出去——這條路
+// 從上線以來從來沒有為真實使用者運作過，測試者看到的是「驗證信寄送失敗」。
+// 實際分佈：1,088 個帳號裡 Google 1,065、Apple 21，純 email／密碼只有 2 個
+// （團隊自己開的，0 篇日記 0 次測驗）。要讓它能用得養一整條 email 管道
+// （SMTP、網域驗證、退信、外加一個目前不存在的重設密碼頁），換 0.2% 的使用者。
 //
-// 留著它的代價是要養一整條 email 管道（SMTP、網域驗證、退信、重設密碼頁面），
-// 換來 0.2% 的使用者；而 Google／Apple 回傳的信箱本來就是已驗證的。所以整條拿掉。
-// Supabase 後台的 Email provider 沒有關閉，日後真要恢復只需把 UI 加回來。
+// 為什麼「登入」要留著：App Store 送審要在 App Review Information 附 demo 帳號的
+// email 與密碼（見 docs/plans/appstore_rejection_20260816_response.md）。審查員
+// 雖然也能用 Sign in with Apple 自己註冊，但沒有帳密可給會多一輪來回。
+// 收在「用 email 登入」這個次要入口：一般使用者看到的是乾淨的兩顆 OAuth 按鈕，
+// 審查員照 Notes 的指示點一下就找得到。
 //
-// 註：驗證信不是 App Store 的要求——8/16 的退件是 Guideline 1.2／2.1／2.3.3，
-// 跟帳號有關的硬性要求（4.8 Sign in with Apple、5.1.1(v) 刪除帳號、1.2 EULA）
-// 都已經滿足。
+// 忘記密碼一併拿掉：resetPasswordForEmail 寄得出去也沒用，全站沒有任何
+// updateUser 的地方可以輸入新密碼。demo 帳號的密碼由管理者在 Supabase 後台重設。
 
 function LoginPage() {
   const { t } = useLanguage()
+  // email 密碼登入（僅供既有帳號與 App Store 審查用的 demo 帳號；不開放註冊）
+  const [showEmailLogin, setShowEmailLogin] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   // 從 LINE / FB / IG… App 內建瀏覽器打開時，Google 會擋下登入，
   // 這裡記錄是哪一種 App，好顯示對應的引導畫面（null = 不顯示）。
   const [inAppNotice, setInAppNotice] = useState<InAppBrowser>(null)
@@ -104,6 +113,27 @@ function LoginPage() {
       track('login_error', { method: 'apple', platform: 'native' })
       console.error('[login] native apple login failed', err)
     }
+  }
+
+  const handleEmailLogin = async () => {
+    if (!requireAgreement()) return
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail || !password) return
+    setLoading(true)
+    setError(null)
+    track('login_started', { method: 'password', mode: 'login' })
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: trimmedEmail,
+      password,
+    })
+    setLoading(false)
+    if (signInError) {
+      track('login_error', { method: 'password', mode: 'login' })
+      setError(t('Email 或密碼錯誤，請再試一次。'))
+      return
+    }
+    track('login_completed', { method: 'password' })
+    // 成功後 onAuthStateChange 會更新 session，beforeLoad 自動導向 /app/home
   }
 
   const handleCopyUrl = async () => {
@@ -173,6 +203,45 @@ function LoginPage() {
             <GoogleIcon />
             {t('用 Google 登入')}
           </button>
+
+          {/* email 密碼登入：收在次要入口。給既有帳號與 App Store 審查的 demo 帳號用，
+              不開放註冊（原因見檔案開頭）。 */}
+          {showEmailLogin ? (
+            <div className="space-y-3 pt-1">
+              <input
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                placeholder={t('輸入 email')}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="h-14 w-full rounded-full bg-card px-6 text-center text-base font-semibold text-foreground shadow-soft outline-none placeholder:text-muted-foreground/60"
+              />
+              <input
+                type="password"
+                autoComplete="current-password"
+                placeholder={t('輸入密碼')}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="h-14 w-full rounded-full bg-card px-6 text-center text-base font-semibold text-foreground shadow-soft outline-none placeholder:text-muted-foreground/60"
+              />
+              {error && <p className="text-center text-xs font-semibold text-red-500">{error}</p>}
+              <button
+                onClick={handleEmailLogin}
+                disabled={loading || !email.trim() || !password}
+                className="flex h-14 w-full items-center justify-center rounded-full bg-primary text-base font-extrabold tracking-wide text-primary-foreground shadow-soft transition active:scale-[0.98] disabled:opacity-50"
+              >
+                {loading ? t('登入中…') : t('登入')}
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowEmailLogin(true)}
+              className="block w-full pt-1 text-center text-xs font-semibold text-muted-foreground underline"
+            >
+              {t('用 email 登入')}
+            </button>
+          )}
 
           {/* 條款同意（App Store 審查指南 1.2）。
               放在所有登入按鈕「下方」但仍在同一個面板內，讓審查錄影一次拍到
