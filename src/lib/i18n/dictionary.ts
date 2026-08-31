@@ -18,6 +18,7 @@ import { diaryAssessment } from './dict/diary-assessment'
 import { marketplace } from './dict/marketplace'
 import { appUpdate } from './dict/app-update'
 import { paywall } from './dict/paywall'
+import { welcome } from './dict/welcome'
 
 export type Translation = { 'zh-CN': string; en: string }
 export type Dictionary = Record<string, Translation>
@@ -41,4 +42,5 @@ export const DICTIONARY: Dictionary = {
   ...marketplace,
   ...appUpdate,
   ...paywall,
+  ...welcome,
 }
