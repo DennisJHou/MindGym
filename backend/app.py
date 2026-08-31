@@ -245,28 +245,6 @@ async def _annotate_review_lock(user_id: str, row: dict) -> dict:
     return {**row, "locked": earlier >= 1, "tier": tier}
 
 
-async def _check_baseline_assessment_quota(user_id: str) -> None:
-    """基線檢測額度：免費層限 1 次、付費層無限重測（規格 §2 權益對照表）。
-
-    ⚠️ 第一次檢測永遠放行。規格 §3 明令基線報告是付費牆之前唯一的價值證明，
-       不可鎖——所以這裡只擋「已經做過至少一次、又不是付費會員」的重測。
-    """
-    resp = await db().get(
-        f"{SUPABASE_REST}/perma_scores",
-        headers=SUPABASE_HEADERS,
-        params=[("user_id", f"eq.{user_id}"), ("select", "id"), ("limit", "1")],
-    )
-    already_assessed = bool(resp.json()) if resp.status_code == 200 else False
-    if not already_assessed:
-        return  # 第一次，一律放行
-
-    if await _subscription_tier(user_id) == "free":
-        raise HTTPException(
-            status_code=402,
-            detail={"error": "quota_exceeded", "feature": "baseline_assessment", "tier": "free"},
-        )
-
-
 # ── Models ─────────────────────────────────────────────────────────────────
 
 class GratitudeTagRequest(BaseModel):
@@ -772,10 +750,6 @@ async def generate_report(
 ):
     token = authorization.removeprefix("Bearer ").strip()
     user_id = await get_user_id(token)
-
-    # 基線檢測額度：免費層限 1 次、付費層無限重測（規格 §2 權益對照表）。
-    # ⚠️ 第一次檢測永遠放行——那是付費牆之前唯一的價值證明，規格 §3 明令不可鎖。
-    await _check_baseline_assessment_quota(user_id)
 
     for field, text in answers.model_dump().items():
         if len(text.strip()) < 10:

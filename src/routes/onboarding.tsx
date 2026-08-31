@@ -12,7 +12,6 @@ import { markOnboardingSkipped } from '../lib/onboardingSkip'
 import { useLanguage } from '../lib/i18n/context'
 import { LanguageSwitcherCompact } from '../components/LanguageSwitcher'
 import { useGlobalKeyboard } from '../lib/keyboard'
-import { FREE_FALLBACK, fetchEntitlements } from '../lib/entitlements'
 import { clearQuizDraft, loadQuizDraft, quizDraftKey, saveQuizDraft } from '../lib/quizDraft'
 import { PaywallScreen } from '../components/paywall/PaywallScreen'
 
@@ -305,48 +304,9 @@ function OnboardingPage() {
   const [isTimeoutError, setIsTimeoutError] = useState(false)
   // 規格 Day 0：基線報告看完後自然接到付費牆。重測／回看舊報告不再出現。
   const [showPaywall, setShowPaywall] = useState(false)
-  // 付費牆為什麼出現：'baseline' 是做完基線的自然銜接（關掉要往下一步走），
-  // 'quota' 是免費層重測被擋（關掉應該留在原地，不能把人丟去別的練習）。
-  const [paywallReason, setPaywallReason] = useState<'baseline' | 'quota'>('baseline')
-  // 重測時先問一次權益，好在「開始測驗」之前就擋下來——不然使用者會認真寫完
-  // 五題長文才發現不能送出（規格 §2 免費層基線檢測限 1 次）。
-  // 只在 reassess 進來時判斷：第一次做檢測的人 beforeLoad 就不會被導開，
-  // 而 fetchEntitlements 失敗時的保守預設是「不能重測」，拿來擋第一次會誤傷。
-  const [canRetake, setCanRetake] = useState<boolean | null>(null)
 
   // 測驗不再強制：進行到一半也能由左往右滑或按返回鍵放棄，退回到可以「跳過測驗」的入口頁。
   const triggerBack = useStageBack(screen, (s) => s !== 'quiz', () => setScreen('intro'))
-
-  // 背景先問權益，不擋畫面。問到之前使用者若已經按下開始，就照舊往下走，
-  // 送出時後端的 402 仍然是最後一道（也是真正有效的）防線。
-  useEffect(() => {
-    if (!reassess) return
-    let cancelled = false
-    void fetchEntitlements().then((ent) => {
-      if (cancelled) return
-      // 查詢失敗時 fetchEntitlements 會回傳 FREE_FALLBACK 這個常數本身（保守預設：
-      // 當成免費層且額度用完）。那個預設是給「要不要顯示付費功能」用的，拿來擋
-      // 「開始測驗」會誤傷付費會員——RPC 抖一下，付費的人就進不去了。
-      // 所以只有真的問到才在入口擋；問不到就放行，交給送出時的 402 把關。
-      if (ent === FREE_FALLBACK) return
-      setCanRetake(ent.baseline_assessment.can_retake)
-    })
-    return () => { cancelled = true }
-  }, [reassess])
-
-  // 額度用完時共用的處理：能撈到上次的報告就把它放到畫面上，再疊付費牆。
-  // 使用者已經賺到的價值不能被牆擋住——尤其是「第一次測驗其實成功了、只是前端
-  // 逾時放棄」的人，報告（含 report_json）早就寫進 perma_scores 了。
-  const openQuotaPaywall = async (at: 'intro' | 'submit') => {
-    track('baseline_retake_blocked', { at })
-    setPaywallReason('quota')
-    setShowPaywall(true)
-    if (!session) return
-    const latest = await fetchLatestReport(session.user.id)
-    if (!latest) return
-    setReport(latest)
-    setScreen('report')
-  }
 
   function handleSkip() {
     markOnboardingSkipped()
@@ -372,15 +332,6 @@ function OnboardingPage() {
         body: JSON.stringify(finalAnswers),
         signal: controller.signal,
       })
-      // 402 = 後端 _check_baseline_assessment_quota 擋下「免費層重測」。
-      // 這不是故障：規格 §2 免費層基線檢測限 1 次，第二次起要付費。
-      // 若不在這裡攔，會掉進下面的 throw，錯誤頁顯示「網路或 AI 服務暫時有問題」——
-      // 使用者按重試永遠是同一個 402，看起來就像測驗壞掉（2026-08-29 的實際災情）。
-      if (res.status === 402) {
-        setScreen('quiz')  // 先回到作答畫面（內容都還在），再視情況換成上次的報告
-        void openQuotaPaywall('submit')
-        return
-      }
       const data = await res.json()
       if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`)
       setReport(data)
@@ -408,16 +359,12 @@ function OnboardingPage() {
       navigate({ to: '/app/home' })
       return
     }
-    setPaywallReason('baseline')
     setShowPaywall(true)
   }
 
   // 付費牆關閉（✕ 或「先自己逛逛」）後，continue 到原本的目的地。
   function handlePaywallDismiss() {
     setShowPaywall(false)
-    // 額度用完而跳的牆：使用者是自己點「重新檢測」進來的，關掉之後應該留在
-    // 原地（多半是剛放上來的上次報告），不要把人丟進另一個練習。
-    if (paywallReason === 'quota') return
     navigate({ to: '/app/gratitude' })
   }
 
@@ -427,12 +374,6 @@ function OnboardingPage() {
     content = (
       <LandingPage
         onStart={() => {
-          // 免費層重測：在這裡就擋下來，不要讓人寫完五題長文才發現不能送出。
-          // canRetake 還沒問到（null）就照舊放行，送出時的 402 仍然接得住。
-          if (reassess && canRetake === false) {
-            void openQuotaPaywall('intro')
-            return
-          }
           track('quiz_started', { reassess: Boolean(reassess) })
           setScreen('quiz')
         }}
