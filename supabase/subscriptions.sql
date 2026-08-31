@@ -245,7 +245,7 @@ BEGIN
     ),
     'baseline_assessment', jsonb_build_object(
       'used',          v_perma_used,
-      'can_retake',    v_pro OR v_perma_used < 1   -- 免費層限 1 次
+      'can_retake',    true   -- 暫不限制重測次數，免費層也能無限重測
     ),
     -- 月報告／趨勢／成長對照這些功能目前尚未實作，先預留旗標供日後接上。
     'can_view_trends', v_pro,
