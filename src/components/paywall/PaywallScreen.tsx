@@ -296,11 +296,13 @@ export function PaywallScreen({ source, scores: scoresProp, onDismiss }: Paywall
 
       {showIntentNotice && (
         <NoticeSheet
-          title={t('申請已送出，審核中！')}
+          title={t('全部功能已為你解鎖！')}
           body={
             <>
               <p>{t('非常開心有你的加入，成為 PSY by PSY 心理健身房的創始成員！')}</p>
-              <p className="mt-3">{t('我們開放訂閱會員的時候，你就可以擁有以下權益：')}</p>
+              {/* ⚠️ 權益是「立即」生效的（見 supabase/subscriptions.sql 的 is_pro()），
+                  不要再寫成「開放訂閱後才有」或「審核中」——那會與實際行為不符。 */}
+              <p className="mt-3">{t('以下權益現在就可以使用：')}</p>
               <ul className="mt-3 flex flex-col gap-2">
                 {[
                   '每週一份 AI 個人化心理健康專屬週報',
@@ -316,7 +318,7 @@ export function PaywallScreen({ source, scores: scoresProp, onDismiss }: Paywall
                 ))}
               </ul>
               <p className="mt-3 text-xs text-muted-foreground">
-                {t('通常 48 小時內會審核完成，通過後會通知你。')}
+                {t('未來開放訂閱時我們會先通知你，不會自動扣款。')}
               </p>
             </>
           }

@@ -181,7 +181,21 @@ async def _subscription_tier(user_id: str) -> str:
        獨立的，勾了創始成員卻留著 tier='free' 會讓付費牆說「你已經是創始成員」、
        週報告卻仍被鎖住（2026-09-01 使用者回報）。這兩處必須一起改，只改一邊
        會讓前端顯示與後端把關再度對不上。
+
+    ⚠️ 付費意願測試期間（2026-09-01 起）：**點過付費牆 CTA 就視為 'pro'**，
+       不必等管理員核准。與 is_pro() 同一條規則，改動時兩邊必須一起改。
+       接上真實金流前，這段 paywall_intents 查詢要移除。
     """
+    # 先問「點過付費按鈕沒有」——這是測試期間最常命中的條件，
+    # 命中就不必再查 subscriptions。
+    intent_resp = await db().get(
+        f"{SUPABASE_REST}/paywall_intents",
+        headers=SUPABASE_HEADERS,
+        params=[("user_id", f"eq.{user_id}"), ("select", "id"), ("limit", "1")],
+    )
+    if intent_resp.status_code == 200 and intent_resp.json():
+        return "pro"
+
     resp = await db().get(
         f"{SUPABASE_REST}/subscriptions",
         headers=SUPABASE_HEADERS,

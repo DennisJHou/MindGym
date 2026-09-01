@@ -14,8 +14,14 @@
 --     4. 週分析額度與基線重測額度另在 backend/app.py 用已驗證的 JWT 再擋一次
 --        （那兩個動作要花 AI token，必須在生成前就擋掉）。
 --
--- 這階段**不接金流**：付費牆 CTA 只寫入 paywall_intents 量測付費意願，
--- 權益開通由管理員在 /admin →「訂閱管理」手動設定。
+-- 這階段**不接金流**：付費牆 CTA 寫入 paywall_intents 量測付費意願。
+--
+-- ⚠️ 2026-09-01 起改為「**點過付費按鈕就直接開通完整權益**」，不再需要管理員核准。
+--    這是刻意的產品決策：用來量測付費意願，同時讓願意付費的人立刻拿到價值。
+--    因此上面第 1、2 點對「付費權益」在測試期間不再成立（詳見 is_pro() 的註解）。
+--    社群 RLS（第 3 點）與 AI 額度（第 4 點）的把關機制本身沒變，
+--    只是判斷「你是不是付費會員」的那條規則放寬了。
+--    ⚠️ 接上真實金流前，is_pro() 必須改回只認 subscriptions。
 --
 -- ⚠️ 依賴 pro_modules.sql 已建立的 is_admin(uid)，請確認該檔已先執行過。
 -- ⚠️ 金額一律以「分」儲存並記錄幣別（規格 §6）。
@@ -111,6 +117,8 @@ CREATE TABLE IF NOT EXISTS paywall_intents (
 );
 
 CREATE INDEX IF NOT EXISTS paywall_intents_created_idx ON paywall_intents (created_at DESC);
+-- is_pro() 每次都要問「這個人點過付費按鈕沒有」，沒有這個索引會全表掃描。
+CREATE INDEX IF NOT EXISTS paywall_intents_user_idx ON paywall_intents (user_id);
 
 ALTER TABLE paywall_intents ENABLE ROW LEVEL SECURITY;
 
@@ -137,20 +145,31 @@ CREATE POLICY "paywall_intents: admin 可讀" ON paywall_intents
 --    勾了創始成員卻留著 tier='free' 會產生「付費牆說你已經是創始成員、
 --    但週報告仍被鎖住」的矛盾（2026-09-01 使用者回報）。
 --    把徽章與權益綁在同一條規則上，這種不一致狀態就不可能再出現。
+-- ⚠️ 付費意願測試期間（2026-09-01 起）：**點過付費牆 CTA 就直接享有完整權益**，
+--    不必等管理員核准。目的是量測「有多少人願意為這些功能付費」，並讓願意的人
+--    立刻拿到東西、不用等。paywall_intents 有一列就算數。
+--
+--    這代表本檔案開頭「client 端改任何本機狀態都不能解鎖功能」的原則，
+--    在這個測試期間對「付費權益」不再成立——因為 paywall_intents 開放本人
+--    INSERT，使用者可以自己寫入一列。但這不構成新的風險：那顆按鈕本來就人人
+--    都點得到，繞過 UI 直接寫入拿到的東西，跟點按鈕拿到的完全一樣。
+--    ⚠️ 接上真實金流前，這裡必須改回只認 subscriptions。
 CREATE OR REPLACE FUNCTION is_pro(uid uuid) RETURNS boolean
 LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM subscriptions
-    WHERE user_id = uid
-      AND (
-        is_founding_member
-        OR (
-          tier   IN ('pro', 'pass')
-          AND status IN ('trialing', 'active', 'grace')
-          AND (expires_at IS NULL OR expires_at > now())
+  SELECT
+    EXISTS (SELECT 1 FROM paywall_intents WHERE user_id = uid)
+    OR EXISTS (
+      SELECT 1 FROM subscriptions
+      WHERE user_id = uid
+        AND (
+          is_founding_member
+          OR (
+            tier   IN ('pro', 'pass')
+            AND status IN ('trialing', 'active', 'grace')
+            AND (expires_at IS NULL OR expires_at > now())
+          )
         )
-      )
-  )
+    )
 $$;
 
 -- 社群是否已解鎖：付費會員恆真；免費會員本週發過 ≥1 則分享紀錄即解鎖當週。
