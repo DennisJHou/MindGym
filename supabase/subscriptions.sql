@@ -129,15 +129,27 @@ CREATE POLICY "paywall_intents: admin 可讀" ON paywall_intents
 --    沿用 pro_modules.sql 的 is_admin()/is_practitioner() 慣例。
 -- ============================================================
 
--- 是否為有效付費會員。查無 subscriptions 列 → false（視為免費層，不報錯）。
+-- 是否享有付費權益。查無 subscriptions 列 → false（視為免費層，不報錯）。
+--
+-- ⚠️ 創始成員（is_founding_member）也算數，且**不看 tier 與到期日**。
+--    原因：後台有兩條設定路徑——收件匣的「核准為創始成員」會同時把 tier 設成
+--    'pro'，但訂閱管理卡片的「設為創始會員」勾選框與 tier 下拉是各自獨立的，
+--    勾了創始成員卻留著 tier='free' 會產生「付費牆說你已經是創始成員、
+--    但週報告仍被鎖住」的矛盾（2026-09-01 使用者回報）。
+--    把徽章與權益綁在同一條規則上，這種不一致狀態就不可能再出現。
 CREATE OR REPLACE FUNCTION is_pro(uid uuid) RETURNS boolean
 LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
   SELECT EXISTS (
     SELECT 1 FROM subscriptions
     WHERE user_id = uid
-      AND tier   IN ('pro', 'pass')
-      AND status IN ('trialing', 'active', 'grace')
-      AND (expires_at IS NULL OR expires_at > now())
+      AND (
+        is_founding_member
+        OR (
+          tier   IN ('pro', 'pass')
+          AND status IN ('trialing', 'active', 'grace')
+          AND (expires_at IS NULL OR expires_at > now())
+        )
+      )
   )
 $$;
 
@@ -176,6 +188,11 @@ LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
   SELECT CASE WHEN is_pro(uid) THEN date_trunc('week', now()) ELSE date_trunc('month', now()) END
 $$;
 
+-- ⚠️ 這支把兩種報告合起來數，只給 get_my_entitlements() 回傳「大概用了幾份」
+--    當參考資訊用（目前前端未消費此欄位）。**真正決定某份報告要不要上鎖的是
+--    backend/app.py 的 _annotate_review_lock()，那裡是「每種報告各自計算」**——
+--    因為 gratitude_weekly 與 weekly_digest 同一週經常並存，合併計數會把後生成
+--    的那份誤判成超額。要拿這個數字做任何把關之前，請先改成同樣的 per-type 邏輯。
 CREATE OR REPLACE FUNCTION weekly_analysis_used(uid uuid) RETURNS integer
 LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
   SELECT count(*)::int FROM pro_reviews
