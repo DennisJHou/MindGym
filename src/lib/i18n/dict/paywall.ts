@@ -59,8 +59,15 @@ export const paywall: Record<string, Translation> = {
 
   // /admin 創始成員申請
   '創始成員申請': { 'zh-CN': '创始成员申请', en: 'Founding member applications' },
-  '待處理 {n} 筆': { 'zh-CN': '待处理 {n} 笔', en: '{n} pending' },
-  '目前沒有新的申請': { 'zh-CN': '目前没有新的申请', en: 'No new applications' },
+  '點過付費按鈕的人': { 'zh-CN': '点过付费按钮的人', en: 'People who tapped the paywall CTA' },
+  '共 {n} 人': { 'zh-CN': '共 {n} 人', en: '{n} total' },
+  '這些人點過付費牆的 CTA，已自動享有完整權益（全部分析、全部報告、社群無限瀏覽）。下方按鈕只是額外加上「創始成員」徽章。': {
+    'zh-CN': '这些人点过付费墙的 CTA，已自动享有完整权益（全部分析、全部报告、社区无限浏览）。下方按钮只是额外加上「创始成员」徽章。',
+    en: 'These people tapped the paywall CTA and already have full access (all analyses, all reports, unlimited community). The button below only adds the "Founding Member" badge.',
+  },
+  '目前還沒有人點過': { 'zh-CN': '目前还没有人点过', en: 'Nobody has tapped it yet' },
+  '已有徽章': { 'zh-CN': '已有徽章', en: 'Has badge' },
+  '給予創始成員徽章': { 'zh-CN': '给予创始成员徽章', en: 'Grant founding member badge' },
   '已核准': { 'zh-CN': '已核准', en: 'Approved' },
   '待核准': { 'zh-CN': '待核准', en: 'Pending' },
   '核准為創始成員': { 'zh-CN': '批准为创始成员', en: 'Approve as founding member' },
@@ -81,9 +88,17 @@ export const paywall: Record<string, Translation> = {
   '立即成為創始成員': { 'zh-CN': '立即成为创始成员', en: 'Become a founding member now' },
 
   // ── CTA 點擊後的說明（這階段不接金流）─────────────────────────────────
-  '申請已送出，審核中！': {
-    'zh-CN': '申请已送出，审核中！',
-    en: 'Application submitted — under review!',
+  '全部功能已為你解鎖！': {
+    'zh-CN': '全部功能已为你解锁！',
+    en: 'Everything is unlocked for you!',
+  },
+  '以下權益現在就可以使用：': {
+    'zh-CN': '以下权益现在就可以使用：',
+    en: 'These are available to you right now:',
+  },
+  '未來開放訂閱時我們會先通知你，不會自動扣款。': {
+    'zh-CN': '未来开放订阅时我们会先通知你，不会自动扣款。',
+    en: "We'll let you know before subscriptions open — nothing is charged automatically.",
   },
   '非常開心有你的加入，成為 PSY by PSY 心理健身房的創始成員！': {
     'zh-CN': '非常开心有你的加入，成为 PSY by PSY 心理健身房的创始成员！',

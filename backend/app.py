@@ -175,16 +175,42 @@ async def _subscription_tier(user_id: str) -> str:
     查無 subscriptions 列 = 免費層（絕大多數既有使用者都沒有這一列），
     狀態不有效或已過期也一律降回 'free'。判斷邏輯與
     supabase/subscriptions.sql 的 is_pro() 保持一致。
+
+    ⚠️ 創始成員（is_founding_member）直接視為 'pro'，且**不看 tier 與到期日**——
+       與 is_pro() 同一條規則。後台的「設為創始會員」勾選框與 tier 下拉是各自
+       獨立的，勾了創始成員卻留著 tier='free' 會讓付費牆說「你已經是創始成員」、
+       週報告卻仍被鎖住（2026-09-01 使用者回報）。這兩處必須一起改，只改一邊
+       會讓前端顯示與後端把關再度對不上。
+
+    ⚠️ 付費意願測試期間（2026-09-01 起）：**點過付費牆 CTA 就視為 'pro'**，
+       不必等管理員核准。與 is_pro() 同一條規則，改動時兩邊必須一起改。
+       接上真實金流前，這段 paywall_intents 查詢要移除。
     """
+    # 先問「點過付費按鈕沒有」——這是測試期間最常命中的條件，
+    # 命中就不必再查 subscriptions。
+    intent_resp = await db().get(
+        f"{SUPABASE_REST}/paywall_intents",
+        headers=SUPABASE_HEADERS,
+        params=[("user_id", f"eq.{user_id}"), ("select", "id"), ("limit", "1")],
+    )
+    if intent_resp.status_code == 200 and intent_resp.json():
+        return "pro"
+
     resp = await db().get(
         f"{SUPABASE_REST}/subscriptions",
         headers=SUPABASE_HEADERS,
-        params=[("user_id", f"eq.{user_id}"), ("select", "tier,status,expires_at"), ("limit", "1")],
+        params=[
+            ("user_id", f"eq.{user_id}"),
+            ("select", "tier,status,expires_at,is_founding_member"),
+            ("limit", "1"),
+        ],
     )
     rows = resp.json() if resp.status_code == 200 else []
     if not rows:
         return "free"
     row = rows[0]
+    if row.get("is_founding_member"):
+        return "pro"
     if row.get("tier") not in ("pro", "pass"):
         return "free"
     if row.get("status") not in ("trialing", "active", "grace"):
@@ -213,6 +239,12 @@ async def _annotate_review_lock(user_id: str, row: dict) -> dict:
     判定方式是「這份報告是不是它所屬週期裡最早生成的那一份」——
     比它更早生成的同週期報告若已有 1 份，這份就是超額的，標記為 locked。
 
+    ⚠️ 額度是「每種報告各自計算」，不是兩種合起來算一份。
+       gratitude_weekly（感恩週回顧，checkAndGenerateReviews 自動生成）與
+       weekly_digest（一週回顧頁的情緒分析）是兩種不同的報告，同一週經常兩份
+       都會存在。若合併計數，後生成的那份必定被判定超額——連付費會員也會被鎖，
+       這正是 2026-09-01 使用者回報「已是創始成員卻看不到週報告」的第二個原因。
+
     ⚠️ 為什麼是「照常生成、只鎖顯示」而不是直接拒絕生成？
        規格 §3／§9 要求軟性付費牆必須呈現「真實生成內容的前 30%」，
        不可用功能清單或空白頁替代——所以報告一定得先真的存在。
@@ -230,12 +262,14 @@ async def _annotate_review_lock(user_id: str, row: dict) -> dict:
         at = datetime.now(timezone.utc)
 
     period_start = _analysis_period_start(tier, at)
+    # 只跟「同一種」報告比，見上方註解。
+    review_type = row.get("review_type") or "weekly_digest"
     resp = await db().get(
         f"{SUPABASE_REST}/pro_reviews",
         headers=SUPABASE_HEADERS,
         params=[
             ("user_id", f"eq.{user_id}"),
-            ("review_type", "in.(gratitude_weekly,weekly_digest)"),
+            ("review_type", f"eq.{review_type}"),
             ("created_at", f"gte.{period_start.isoformat()}"),
             ("created_at", f"lt.{at.isoformat()}"),
             ("select", "id"),
