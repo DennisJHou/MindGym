@@ -1,4 +1,4 @@
-// 完成任一健心模組打卡後（一輩子只跳一次，見 useFoundingInviteGate）的創始成員邀請小視窗。
+// 完成任一健心模組打卡後的創始成員邀請小視窗（每次完成都跳，見 useFoundingInviteGate）。
 import { useNavigate } from '@tanstack/react-router'
 import { useLanguage } from '../../lib/i18n/context'
 import { track } from '../../lib/analytics'

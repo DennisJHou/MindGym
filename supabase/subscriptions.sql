@@ -16,11 +16,14 @@
 --
 -- 這階段**不接金流**：付費牆 CTA 寫入 paywall_intents 量測付費意願。
 --
--- ⚠️ 2026-09-01 起改為「**點過付費按鈕就直接開通完整權益**」，不再需要管理員核准。
---    這是刻意的產品決策：用來量測付費意願，同時讓願意付費的人立刻拿到價值。
---    因此上面第 1、2 點對「付費權益」在測試期間不再成立（詳見 is_pro() 的註解）。
---    社群 RLS（第 3 點）與 AI 額度（第 4 點）的把關機制本身沒變，
---    只是判斷「你是不是付費會員」的那條規則放寬了。
+-- ⚠️ 2026-09-01 起改為「**全功能對所有登入者開放**」（產品決策）：
+--      * is_pro() 對任何登入者恆真 —— 社群不再有觀看則數上限、AI 分析不再有份數上限。
+--      * 「創始成員」（is_founding_member）降級為**純標籤／徽章**，不再牽動任何權益。
+--        它只出現在 get_my_entitlements() 的回傳與貼文徽章上。
+--      * paywall_intents 仍照常寫入 —— 付費意願量測還要繼續，只是不再拿來開通權益。
+--    因此上面第 1、2 點對「付費權益」暫時失去意義（沒有東西需要被鎖）。
+--    第 3 點的社群 RLS 與第 4 點的 AI 額度**機制仍在原地**，只是判斷式現在恆真，
+--    要收回限制時改 is_pro() 一處即可。
 --    ⚠️ 接上真實金流前，is_pro() 必須改回只認 subscriptions。
 --
 -- ⚠️ 依賴 pro_modules.sql 已建立的 is_admin(uid)，請確認該檔已先執行過。
@@ -137,39 +140,32 @@ CREATE POLICY "paywall_intents: admin 可讀" ON paywall_intents
 --    沿用 pro_modules.sql 的 is_admin()/is_practitioner() 慣例。
 -- ============================================================
 
--- 是否享有付費權益。查無 subscriptions 列 → false（視為免費層，不報錯）。
+-- 是否享有付費權益。
 --
--- ⚠️ 創始成員（is_founding_member）也算數，且**不看 tier 與到期日**。
---    原因：後台有兩條設定路徑——收件匣的「核准為創始成員」會同時把 tier 設成
---    'pro'，但訂閱管理卡片的「設為創始會員」勾選框與 tier 下拉是各自獨立的，
---    勾了創始成員卻留著 tier='free' 會產生「付費牆說你已經是創始成員、
---    但週報告仍被鎖住」的矛盾（2026-09-01 使用者回報）。
---    把徽章與權益綁在同一條規則上，這種不一致狀態就不可能再出現。
--- ⚠️ 付費意願測試期間（2026-09-01 起）：**點過付費牆 CTA 就直接享有完整權益**，
---    不必等管理員核准。目的是量測「有多少人願意為這些功能付費」，並讓願意的人
---    立刻拿到東西、不用等。paywall_intents 有一列就算數。
+-- ⚠️ 2026-09-01 起：**所有登入者一律享有完整權益**（產品決策，見檔案開頭）。
+--    社群觀看則數上限、AI 週分析份數上限都由這支函式推導出來，所以這裡回 true
+--    就等於「全部功能開放給所有人」，不必逐條去拆各處的限制邏輯。
 --
---    這代表本檔案開頭「client 端改任何本機狀態都不能解鎖功能」的原則，
---    在這個測試期間對「付費權益」不再成立——因為 paywall_intents 開放本人
---    INSERT，使用者可以自己寫入一列。但這不構成新的風險：那顆按鈕本來就人人
---    都點得到，繞過 UI 直接寫入拿到的東西，跟點按鈕拿到的完全一樣。
---    ⚠️ 接上真實金流前，這裡必須改回只認 subscriptions。
+--    這也代表「創始成員」（subscriptions.is_founding_member）與「點過付費按鈕」
+--    （paywall_intents）**都不再影響權益**：
+--      * 創始成員現在只是一個標籤／徽章，給貼文與個人頁顯示用。
+--      * paywall_intents 仍照常寫入，只作為付費意願的量測資料。
+--
+--    ⚠️ 要恢復付費分層（接金流時）只要把這支換回下面被註解掉的原始判斷即可，
+--       呼叫端（community_unlocked / weekly_analysis_period_start /
+--       get_my_entitlements）都不用動。後端 backend/app.py 的
+--       _subscription_tier() 是同一條規則的另一份實作，**必須一起改**。
+--
+--    原始判斷（保留備查）：
+--      SELECT EXISTS (SELECT 1 FROM paywall_intents WHERE user_id = uid)
+--        OR EXISTS (SELECT 1 FROM subscriptions WHERE user_id = uid
+--                     AND (is_founding_member
+--                          OR (tier IN ('pro','pass')
+--                              AND status IN ('trialing','active','grace')
+--                              AND (expires_at IS NULL OR expires_at > now()))))
 CREATE OR REPLACE FUNCTION is_pro(uid uuid) RETURNS boolean
 LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
-  SELECT
-    EXISTS (SELECT 1 FROM paywall_intents WHERE user_id = uid)
-    OR EXISTS (
-      SELECT 1 FROM subscriptions
-      WHERE user_id = uid
-        AND (
-          is_founding_member
-          OR (
-            tier   IN ('pro', 'pass')
-            AND status IN ('trialing', 'active', 'grace')
-            AND (expires_at IS NULL OR expires_at > now())
-          )
-        )
-    )
+  SELECT uid IS NOT NULL
 $$;
 
 -- 社群是否已解鎖：付費會員恆真；免費會員本週發過 ≥1 則分享紀錄即解鎖當週。
@@ -250,8 +246,9 @@ BEGIN
   END IF;
 
   v_pro   := is_pro(uid);
-  -- 免費與付費的份數上限都是 1，差別在「週期長度」：免費每月 1 份、付費每週 1 份。
-  v_limit := 1;
+  -- ⚠️ 2026-09-01 起 AI 分析不再有份數上限（見檔案開頭）。-1 代表「不限」，
+  --    另外附上 unlimited 旗標讓前端不必去解讀這個數字。
+  v_limit := -1;
   v_used  := weekly_analysis_used(uid);
 
   SELECT count(*)::int INTO v_perma_used FROM perma_scores WHERE user_id = uid;
@@ -260,14 +257,16 @@ BEGIN
     'tier',               v_tier,
     'status',             v_status,
     'is_pro',             v_pro,
+    -- ⚠️ 純標籤：只給貼文徽章／個人頁顯示用，**不影響任何權益**（見 is_pro()）。
     'is_founding_member', v_founding,
     'expires_at',         v_expires,
     'weekly_analysis', jsonb_build_object(
       'period',       CASE WHEN v_pro THEN 'week' ELSE 'month' END,
       'period_start', weekly_analysis_period_start(uid),
-      'limit',        v_limit,
+      'unlimited',    true,
+      'limit',        v_limit,    -- -1 = 不限
       'used',         v_used,
-      'remaining',    GREATEST(0, v_limit - v_used)
+      'remaining',    -1
     ),
     'community', jsonb_build_object(
       'unlimited',             v_pro,

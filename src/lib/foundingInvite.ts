@@ -1,32 +1,25 @@
 // ─────────────────────────────────────────────────────────────────────────
-// 「完成任一健心模組後邀請加入創始成員」——一個使用者一輩子只跳一次。
+// 「完成任一健心模組後邀請加入創始成員」
 //
-// 用 profiles.founding_invite_shown_at 的 update-if-null 當搶占鎖：
-// 同時間兩個分頁各自完成一個模組時，只有先送到的那個 update 會真的改到列
-//（WHERE founding_invite_shown_at IS NULL），後到的那個 update 會 0 rows，
-// 藉此保證同一使用者最多只會被判定「該顯示」一次，不必額外查一次再寫一次。
+// ⚠️ 2026-09-01 起改為「**每次完成練習都邀請一次**」（產品決策）。
+//    在此之前是用 profiles.founding_invite_shown_at 當搶占鎖，一個使用者一輩子
+//    只跳一次；現在功能全開、創始成員只剩標籤，這個視窗變成純粹的邀請，
+//    所以每次打卡完成都會出現。
+//    （founding_invite_shown_at 欄位刻意保留不刪，之後若要改回節流可以直接用。）
+//
+//    唯一的例外是「已經是創始成員的人」——對他們再邀請一次沒有意義。
 // ─────────────────────────────────────────────────────────────────────────
 import { supabase } from './supabase'
-import { FREE_FALLBACK, fetchEntitlements } from './entitlements'
+import { OPEN_FALLBACK, fetchEntitlements } from './entitlements'
 
-/** 已經是創始成員的人、或已經看過邀請的人，回傳 false；第一次符合資格的人回傳 true 並就地標記。 */
-export async function claimFoundingInvite(): Promise<boolean> {
+/** 該不該顯示創始成員邀請視窗。已經是創始成員、或未登入 → false，其餘 → true。 */
+export async function shouldShowFoundingInvite(): Promise<boolean> {
   const { data: { session } } = await supabase.auth.getSession()
-  const userId = session?.user.id
-  if (!userId) return false
+  if (!session?.user.id) return false
 
   const ent = await fetchEntitlements()
-  if (ent !== FREE_FALLBACK && ent.is_founding_member) return false
-
-  const { data, error } = await supabase
-    .from('profiles')
-    .update({ founding_invite_shown_at: new Date().toISOString() })
-    .eq('id', userId)
-    .is('founding_invite_shown_at', null)
-    .select('id')
-  if (error) {
-    console.error('[founding invite] 標記失敗', error)
-    return false
-  }
-  return (data?.length ?? 0) > 0
+  // 查詢失敗時回傳的是 OPEN_FALLBACK 這個常數本身，它的 is_founding_member
+  // 只是預設值，不能拿來當「不是創始成員」的證據——寧可這次不打擾。
+  if (ent === OPEN_FALLBACK) return false
+  return !ent.is_founding_member
 }
