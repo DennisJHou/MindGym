@@ -172,61 +172,31 @@ async def get_user_id(token: str) -> str:
 async def _subscription_tier(user_id: str) -> str:
     """讀取訂閱層級（'free' | 'pro' | 'pass'）。
 
-    查無 subscriptions 列 = 免費層（絕大多數既有使用者都沒有這一列），
-    狀態不有效或已過期也一律降回 'free'。判斷邏輯與
-    supabase/subscriptions.sql 的 is_pro() 保持一致。
+    ⚠️ 2026-09-01 起：**所有登入者一律回 'pro'**，也就是全功能對所有人開放
+       （產品決策，見 supabase/subscriptions.sql 開頭）。這支與 SQL 的 is_pro()
+       是同一條規則的兩份實作，**改動時兩邊必須一起改**，只改一邊會讓前端顯示
+       與後端把關對不上。
 
-    ⚠️ 創始成員（is_founding_member）直接視為 'pro'，且**不看 tier 與到期日**——
-       與 is_pro() 同一條規則。後台的「設為創始會員」勾選框與 tier 下拉是各自
-       獨立的，勾了創始成員卻留著 tier='free' 會讓付費牆說「你已經是創始成員」、
-       週報告卻仍被鎖住（2026-09-01 使用者回報）。這兩處必須一起改，只改一邊
-       會讓前端顯示與後端把關再度對不上。
+    ⚠️ 這代表「創始成員」（subscriptions.is_founding_member）與「點過付費按鈕」
+       （paywall_intents）都不再影響權益：前者只剩標籤／徽章，後者只是量測資料。
 
-    ⚠️ 付費意願測試期間（2026-09-01 起）：**點過付費牆 CTA 就視為 'pro'**，
-       不必等管理員核准。與 is_pro() 同一條規則，改動時兩邊必須一起改。
-       接上真實金流前，這段 paywall_intents 查詢要移除。
+    ⚠️ 要恢復付費分層（接金流時）把下面被註解掉的原始實作放回來即可，
+       呼叫端（_annotate_review_lock）不用動。
+
+    原始實作（保留備查）：
+        查 paywall_intents 有無紀錄 → 'pro'；
+        否則查 subscriptions：is_founding_member → 'pro'；
+        tier 需為 pro/pass、status 需為 trialing/active/grace、未過期，否則 'free'。
     """
-    # 先問「點過付費按鈕沒有」——這是測試期間最常命中的條件，
-    # 命中就不必再查 subscriptions。
-    intent_resp = await db().get(
-        f"{SUPABASE_REST}/paywall_intents",
-        headers=SUPABASE_HEADERS,
-        params=[("user_id", f"eq.{user_id}"), ("select", "id"), ("limit", "1")],
-    )
-    if intent_resp.status_code == 200 and intent_resp.json():
-        return "pro"
-
-    resp = await db().get(
-        f"{SUPABASE_REST}/subscriptions",
-        headers=SUPABASE_HEADERS,
-        params=[
-            ("user_id", f"eq.{user_id}"),
-            ("select", "tier,status,expires_at,is_founding_member"),
-            ("limit", "1"),
-        ],
-    )
-    rows = resp.json() if resp.status_code == 200 else []
-    if not rows:
-        return "free"
-    row = rows[0]
-    if row.get("is_founding_member"):
-        return "pro"
-    if row.get("tier") not in ("pro", "pass"):
-        return "free"
-    if row.get("status") not in ("trialing", "active", "grace"):
-        return "free"
-    expires = row.get("expires_at")
-    if expires:
-        try:
-            if datetime.fromisoformat(str(expires).replace("Z", "+00:00")) <= datetime.now(timezone.utc):
-                return "free"
-        except ValueError:
-            logger.warning("subscriptions.expires_at 格式無法解析: %s", expires)
-    return row["tier"]
+    return "pro"
 
 
 def _analysis_period_start(tier: str, at: datetime) -> datetime:
-    """AI 週分析的額度週期起點：免費層以「當月」計、付費層以「當週」計。"""
+    """AI 週分析的額度週期起點：免費層以「當月」計、付費層以「當週」計。
+
+    ⚠️ 2026-09-01 起額度限制已取消，目前沒有呼叫端 —— 刻意保留，
+       接金流要恢復分層時 _annotate_review_lock() 會再用到它。
+    """
     if tier == "free":
         return at.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     return (at - timedelta(days=at.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -254,29 +224,16 @@ async def _annotate_review_lock(user_id: str, row: dict) -> dict:
     額度用「數既有報告」推導而非另存計數，與 subscriptions.sql 的
     weekly_analysis_used() 同一套邏輯：不需要重置排程，期間邊界一到自然歸零。
     """
+    # ⚠️ 2026-09-01 起：AI 分析**不再有份數上限**，任何報告都不上鎖
+    #    （產品決策，見 supabase/subscriptions.sql 開頭）。
+    #    刻意保留這支函式與它的 locked 欄位：前端 app.weekly-review.tsx 讀
+    #    row.locked 決定要不要顯示軟性付費牆，要收回限制時只要把下面被註解掉的
+    #    計數邏輯放回來，前端一行都不用動。
+    #
+    #    原始邏輯（保留備查）：以 _analysis_period_start(tier, at) 取得週期起點，
+    #    數同一 review_type 在該週期內、比這份更早生成的報告；≥1 就是超額 → locked。
     tier = await _subscription_tier(user_id)
-    created_at = row.get("created_at")
-    try:
-        at = datetime.fromisoformat(str(created_at).replace("Z", "+00:00"))
-    except (ValueError, TypeError):
-        at = datetime.now(timezone.utc)
-
-    period_start = _analysis_period_start(tier, at)
-    # 只跟「同一種」報告比，見上方註解。
-    review_type = row.get("review_type") or "weekly_digest"
-    resp = await db().get(
-        f"{SUPABASE_REST}/pro_reviews",
-        headers=SUPABASE_HEADERS,
-        params=[
-            ("user_id", f"eq.{user_id}"),
-            ("review_type", f"eq.{review_type}"),
-            ("created_at", f"gte.{period_start.isoformat()}"),
-            ("created_at", f"lt.{at.isoformat()}"),
-            ("select", "id"),
-        ],
-    )
-    earlier = len(resp.json()) if resp.status_code == 200 else 0
-    return {**row, "locked": earlier >= 1, "tier": tier}
+    return {**row, "locked": False, "tier": tier}
 
 
 # ── Models ─────────────────────────────────────────────────────────────────

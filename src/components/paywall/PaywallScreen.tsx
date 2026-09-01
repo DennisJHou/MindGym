@@ -16,7 +16,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../../lib/supabase'
 import { track } from '../../lib/analytics'
-import { FREE_FALLBACK, fetchEntitlements } from '../../lib/entitlements'
+import { OPEN_FALLBACK, fetchEntitlements } from '../../lib/entitlements'
 import { useLanguage } from '../../lib/i18n/context'
 import {
   type PricingBundle,
@@ -80,9 +80,9 @@ export function PaywallScreen({ source, scores: scoresProp, onDismiss }: Paywall
   useEffect(() => {
     let cancelled = false
     void fetchEntitlements().then((ent) => {
-      // fetchEntitlements 查詢失敗時回傳 FREE_FALLBACK 這個常數本身（保守預設）。
+      // fetchEntitlements 查詢失敗時回傳 OPEN_FALLBACK 這個常數本身（預設值）。
       // 那是給「要不要顯示付費功能」用的，不能拿來當「不是創始成員」的證據。
-      if (cancelled || ent === FREE_FALLBACK) return
+      if (cancelled || ent === OPEN_FALLBACK) return
       setIsFoundingMember(ent.is_founding_member)
     })
     return () => { cancelled = true }
