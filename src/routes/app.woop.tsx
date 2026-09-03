@@ -16,6 +16,7 @@ import { useLanguage } from '../lib/i18n/context'
 import type { Language } from '../lib/i18n/language'
 import { useFoundingInviteGate } from '../lib/useFoundingInvite'
 import { FoundingInviteModal } from '../components/paywall/FoundingInviteModal'
+import { useAutoDismissKeyboard } from '../lib/keyboard'
 
 export const Route = createFileRoute('/app/woop')({
   component: WoopFlow,
@@ -238,6 +239,8 @@ function WoopFlow() {
   const foundingInvite = useFoundingInviteGate()
   // phase：intro（開場介紹）→ 1~4（W/O/O/P）→ done（完成頁）
   const [phase, setPhase] = useState<'intro' | 1 | 2 | 3 | 4 | 'done'>('intro')
+  // 離開需要打字的階段就收鍵盤（輸入框被卸載時 iOS 不會自己收）。
+  useAutoDismissKeyboard(phase !== 'intro' && phase !== 'done')
   const [wish, setWish] = useState('')
   const [outcome, setOutcome] = useState('')
   const [obstacle, setObstacle] = useState('')

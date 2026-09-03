@@ -14,6 +14,7 @@ import { PermaGrowthCard } from '../components/PermaGrowthCard'
 import { TheorySection } from '../components/TheorySection'
 import { track } from '../lib/analytics'
 import { useStageBack } from '../lib/useStageBack'
+import { useAutoDismissKeyboard } from '../lib/keyboard'
 import { useFoundingInviteGate } from '../lib/useFoundingInvite'
 import { FoundingInviteModal } from '../components/paywall/FoundingInviteModal'
 import { type Privacy, DEFAULT_PRIVACY, PRIVACY_OPTIONS, privacyToFields } from '../lib/privacy'
@@ -199,6 +200,9 @@ function GratitudePage() {
   const navigate = useNavigate()
   const router = useRouter()
   const foundingInvite = useFoundingInviteGate()
+  // 離開書寫頁就收鍵盤：進到回顧／發佈頁時輸入框被卸載，iOS 不會自己收鍵盤，
+  // 學員回報「發佈那頁鍵盤還在」。
+  useAutoDismissKeyboard(stage === 'WRITING')
 
   // 邊寫邊存草稿。只在「還沒寫進資料庫」的階段存：存檔成功後草稿就清掉了
   // （見 performSave），結束頁也不需要再存。停下來 400ms 才寫，不用每個字都碰
