@@ -16,6 +16,7 @@ import { type Privacy, DEFAULT_PRIVACY, PRIVACY_OPTIONS, privacyToFields } from 
 import processGoalBanner from '../assets/ui/process-goal-intro-banner.png'
 import { useFoundingInviteGate } from '../lib/useFoundingInvite'
 import { FoundingInviteModal } from '../components/paywall/FoundingInviteModal'
+import { useAutoDismissKeyboard } from '../lib/keyboard'
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8000'
 
@@ -457,6 +458,8 @@ function ProcessGoalPage() {
   const search = Route.useSearch()
   const [userId, setUserId] = useState<string | null>(null)
   const [phase, setPhase] = useState<Phase>('LOADING')
+  // 離開需要打字的階段就收鍵盤（輸入框被卸載時 iOS 不會自己收）。
+  useAutoDismissKeyboard(phase === 'R_INPUT' || phase === 'B_INPUT')
   const [momentCount, setMomentCount] = useState(0)
 
   // 練習內部的 phase 也要能被瀏覽器返回／邊緣滑動手勢／畫面返回鍵一致地「退一層」

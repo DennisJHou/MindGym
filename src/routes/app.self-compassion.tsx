@@ -14,6 +14,7 @@ import { saveOrShareImage } from '../lib/shareImage'
 import heartsBanner from '../assets/ui/自我慈悲 內頁.png'
 import { useFoundingInviteGate } from '../lib/useFoundingInvite'
 import { FoundingInviteModal } from '../components/paywall/FoundingInviteModal'
+import { useAutoDismissKeyboard } from '../lib/keyboard'
 
 const WEEKDAY_LABELS = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
 
@@ -299,6 +300,8 @@ function SelfCompassionPage() {
   const navigate = useNavigate()
   const foundingInvite = useFoundingInviteGate()
   const [stage, setStage] = useState<Stage>('INTRO')
+  // 離開需要打字的階段就收鍵盤（輸入框被卸載時 iOS 不會自己收）。
+  useAutoDismissKeyboard(stage === 'WRITING')
   const [items, setItems] = useState<SelfCompassionItems>(EMPTY_ITEMS)
   const [privacy, setPrivacy] = useState<Privacy>(DEFAULT_PRIVACY)
   const [selectedDate, setSelectedDate] = useState<Date>(() => todayDate())
