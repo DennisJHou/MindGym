@@ -1531,7 +1531,11 @@ function CelebrateStage({
       const counts: Partial<Record<TargetCode, number>> = {}
       for (const row of tagsRes.data ?? []) {
         for (const val of [row.target_1, row.target_2, row.target_3]) {
-          if (val) counts[val as TargetCode] = (counts[val as TargetCode] ?? 0) + 1
+          // AI 標記偶爾會回傳不在五個已知類別內的值（見 backend /api/tag-gratitude-targets
+          // 沒有做輸出驗證），未過濾就丟給 getTargetMeta(t)[code].label 會直接 throw，
+          // 導致這個使用者往後每次完成練習都會在這裡當掉（TestFlight 回報：每次提交都出現
+          // CatchBoundary 的「Something went wrong!」）。
+          if (val && val in TARGET_COLORS) counts[val as TargetCode] = (counts[val as TargetCode] ?? 0) + 1
         }
       }
       const total = Object.values(counts).reduce((s, v) => s + v, 0)
