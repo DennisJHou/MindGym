@@ -19,6 +19,8 @@ import { marketplace } from './dict/marketplace'
 import { appUpdate } from './dict/app-update'
 import { paywall } from './dict/paywall'
 import { welcome } from './dict/welcome'
+import { legal } from './dict/legal'
+import { support } from './dict/support'
 
 export type Translation = { 'zh-CN': string; en: string }
 export type Dictionary = Record<string, Translation>
@@ -43,4 +45,6 @@ export const DICTIONARY: Dictionary = {
   ...appUpdate,
   ...paywall,
   ...welcome,
+  ...legal,
+  ...support,
 }
