@@ -9,7 +9,7 @@ export const Route = createFileRoute('/privacy')({
 
 // 隱私政策頁（公開、免登入）。
 // 用途：App Store 上架強制要求提供「隱私政策 URL」；此頁即為該 URL：
-//   https://mind-gym-kappa.vercel.app/privacy
+//   https://app.psybypsy.com/privacy
 //
 // ⚠️ 內文在 components/legal/PrivacyBody.tsx，與登入後的同意閘門
 //    （components/TermsConsentGate.tsx）共用同一份，避免兩邊內容漂移。

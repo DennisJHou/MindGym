@@ -41,6 +41,16 @@ export const Route = createFileRoute('/login')({
 // 忘記密碼一併拿掉：resetPasswordForEmail 寄得出去也沒用，全站沒有任何
 // updateUser 的地方可以輸入新密碼。demo 帳號的密碼由管理者在 Supabase 後台重設。
 
+// 使用者主動取消登入（Apple/Google 面板按「取消」）不是錯誤，不該跳紅字。
+// Apple 的 ASAuthorizationError.canceled 是 1001；不同 plugin 版本包裝方式不一，
+// 所以 code 與訊息都比對一次。
+function isUserCancelled(err: unknown): boolean {
+  const code = (err as { code?: string | number } | null)?.code
+  if (code === 1001 || code === '1001') return true
+  const message = (err as { message?: string } | null)?.message ?? ''
+  return /cancel/i.test(message)
+}
+
 function LoginPage() {
   const { t } = useLanguage()
   // email 密碼登入（僅供既有帳號與 App Store 審查用的 demo 帳號；不開放註冊）
@@ -77,6 +87,10 @@ function LoginPage() {
         track('login_error', { method: 'google', platform: 'native' })
         console.error('[login] native google login failed', err)
         setInAppNotice(null)
+        if (!isUserCancelled(err)) {
+          setError(t('Google 登入沒有完成。你可以再試一次，或改用下方的 email 登入。'))
+          setShowEmailLogin(true)
+        }
       }
       return
     }
@@ -105,6 +119,7 @@ function LoginPage() {
   // 網頁版沒有這顆按鈕，故這裡不用像 handleGoogleLogin 一樣處理網頁版分支。
   const handleAppleLogin = async () => {
     if (!requireAgreement()) return
+    setError(null)
     try {
       track('login_started', { method: 'apple', platform: 'native' })
       await signInWithAppleNative()
@@ -112,6 +127,16 @@ function LoginPage() {
     } catch (err) {
       track('login_error', { method: 'apple', platform: 'native' })
       console.error('[login] native apple login failed', err)
+      // 使用者自己按取消不算錯誤，不要嚇他。
+      if (isUserCancelled(err)) return
+      // ⚠️ 這裡「一定」要給使用者看得到的訊息並打開 email 登入。
+      //    2026-09-05 被 Apple 以 2.1(a) 退件，原因是 Sign in with Apple 在
+      //    審查機上失敗後畫面毫無反應，審查員直接進不了 App（"We were unable
+      //    to access the app"）。失敗本身可能是 Apple 端狀況（Apple ID 未開
+      //    兩階段驗證、iCloud 未登入、Apple 伺服器暫時性錯誤），我們控制不了；
+      //    但「失敗後沒有出口」是我們的錯，這才是被判定為 bug 的部分。
+      setError(t('Apple 登入沒有完成。你可以再試一次，或改用下方的 Google／email 登入。'))
+      setShowEmailLogin(true)
     }
   }
 
@@ -186,6 +211,14 @@ function LoginPage() {
           Apple 按鈕）就得同步改上面的預留 padding，改漏就會蓋住插圖與文案。 */}
       <div className="w-full pb-10 pt-8">
         <div className="mx-auto w-full max-w-sm space-y-3">
+          {/* 三種登入方式共用的錯誤區。刻意放在按鈕「上方」且不限於 email 面板——
+              原本只在 email 面板內渲染，導致 OAuth 失敗時畫面完全沒有回饋。 */}
+          {error && (
+            <p role="alert" className="text-center text-sm font-semibold text-red-500">
+              {error}
+            </p>
+          )}
+
           {isNativeApp() && (
             <button
               onClick={handleAppleLogin}
@@ -225,7 +258,6 @@ function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 className="h-14 w-full rounded-full bg-card px-6 text-center text-base font-semibold text-foreground shadow-soft outline-none placeholder:text-muted-foreground/60"
               />
-              {error && <p className="text-center text-xs font-semibold text-red-500">{error}</p>}
               <button
                 onClick={handleEmailLogin}
                 disabled={loading || !email.trim() || !password}
@@ -273,6 +305,14 @@ function LoginPage() {
               {t('請先勾選同意使用者條款，才能繼續。')}
             </p>
           )}
+
+          {/* 支援頁入口。刻意「不」放進上面的同意句裡——那句是 Apple 指南 1.2
+              要看的 EULA 同意文字，混進其他連結會模糊焦點。 */}
+          <p className="text-center text-[11px] text-muted-foreground">
+            <Link to="/support" className="font-bold underline">
+              {t('需要協助？聯絡我們')}
+            </Link>
+          </p>
 
           <p className="text-center text-[10px] font-extrabold uppercase tracking-[0.25em] text-muted-foreground">
             PSY by PSY · Train your mind
